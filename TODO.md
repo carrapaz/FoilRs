@@ -15,6 +15,7 @@
 - [x] Add a boundary-layer estimate (transition/separation heuristics + Cd_profile) and surface flow-state indicator.
 - [x] Support Mach/Re inputs, transition modeling, and viscosity toggles so solver inputs match real-world conditions.
 - [x] Make field/Cp visualizations respond to Mach/Re/viscosity (PG scaling + viscous masking/damping).
+- [x] Show panel discretization controls only in Panels view (hide geometry/flow controls there).
 
 ### Essential for a truly useful release
 - [ ] Expand test coverage and reference data (flat plate, symmetric foils, NACA 2412 across α) to keep the solver calibrated.

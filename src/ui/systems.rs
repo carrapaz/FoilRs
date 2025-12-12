@@ -17,10 +17,11 @@ use crate::state::{
 
 use super::types::{
     ExportPolarsButton, ExportStatus, ExportStatusText, FlowToggleKind,
-    InputModeButton, InputSlider, ModePanel, NacaHeading, NumericField,
+    InputModeButton, InputSlider, LeftPanelMainControls,
+    LeftPanelPanelControls, ModePanel, NacaHeading, NumericField,
     NumericInput, NumericInputFocus, NumericInputRow, NumericInputText,
-    PanelSections, SectionContent, SectionToggle, TopBar, UiInputMode,
-    ViewButton,
+    PanelCountText, PanelSections, SectionContent, SectionToggle,
+    TopBar, UiInputMode, ViewButton,
 };
 use super::{config, style};
 use std::path::{Path, PathBuf};
@@ -216,6 +217,57 @@ pub fn update_naca_heading(
     }
     for mut text in &mut headings {
         text.0 = params.code();
+    }
+}
+
+pub fn update_left_panel_visibility(
+    mode: Res<VisualMode>,
+    mut main: Query<
+        &mut Node,
+        (With<LeftPanelMainControls>, Without<LeftPanelPanelControls>),
+    >,
+    mut panels: Query<
+        &mut Node,
+        (With<LeftPanelPanelControls>, Without<LeftPanelMainControls>),
+    >,
+) {
+    if !mode.is_changed() {
+        return;
+    }
+    let show_panels = *mode == VisualMode::Panels;
+    for mut node in &mut main {
+        node.display = if show_panels {
+            Display::None
+        } else {
+            Display::Flex
+        };
+    }
+    for mut node in &mut panels {
+        node.display = if show_panels {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+}
+
+pub fn update_panel_count_text(
+    params: Res<NacaParams>,
+    mut texts: Query<&mut Text, With<PanelCountText>>,
+) {
+    if !params.is_changed() {
+        return;
+    }
+    let total_panels =
+        crate::airfoil::build_naca_body_geometry(&params)
+            .len()
+            .saturating_sub(1);
+    let label = format!(
+        "Points per surface: {}  |  total panels: {}",
+        params.num_points, total_panels
+    );
+    for mut text in &mut texts {
+        text.0 = label.clone();
     }
 }
 

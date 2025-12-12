@@ -95,6 +95,15 @@ pub struct ExportStatus {
 }
 
 #[derive(Component)]
+pub struct LeftPanelMainControls;
+
+#[derive(Component)]
+pub struct LeftPanelPanelControls;
+
+#[derive(Component)]
+pub struct PanelCountText;
+
+#[derive(Component)]
 pub struct NumericInputRow;
 
 #[derive(Component)]

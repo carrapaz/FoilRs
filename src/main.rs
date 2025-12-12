@@ -51,6 +51,8 @@ fn main() {
                 ui::update_naca_heading,
                 ui::update_top_bar_tint,
                 ui::update_mode_panel_tint,
+                ui::update_left_panel_visibility,
+                ui::update_panel_count_text,
                 ui::handle_export_polars_button,
                 ui::update_export_status_text,
                 ui::handle_view_buttons,

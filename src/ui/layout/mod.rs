@@ -1,6 +1,7 @@
 mod flow;
 mod geometry;
 mod numeric;
+mod panel_settings;
 mod summary;
 mod topbar;
 
@@ -10,7 +11,10 @@ use bevy::prelude::*;
 use crate::state::{FlowSettings, NacaParams, VisualMode};
 
 use super::style;
-use super::types::{ModePanel, PanelSections, UiInputMode};
+use super::types::{
+    LeftPanelMainControls, LeftPanelPanelControls, ModePanel,
+    PanelSections, UiInputMode,
+};
 
 pub fn setup_ui(
     mut commands: Commands,
@@ -87,11 +91,48 @@ fn spawn_left_panel(
     flow: &FlowSettings,
     sections: &PanelSections,
 ) {
-    geometry::spawn_geometry_section(
-        panel,
-        asset_server,
-        params,
-        sections,
-    );
-    flow::spawn_flow_section(panel, asset_server, flow, sections);
+    panel
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(14.0),
+                ..default()
+            },
+            LeftPanelMainControls,
+            Name::new("LeftPanelMainControls"),
+        ))
+        .with_children(|main| {
+            geometry::spawn_geometry_section(
+                main,
+                asset_server,
+                params,
+                sections,
+            );
+            flow::spawn_flow_section(
+                main,
+                asset_server,
+                flow,
+                sections,
+            );
+        });
+
+    panel
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(14.0),
+                display: Display::None,
+                ..default()
+            },
+            LeftPanelPanelControls,
+            Name::new("LeftPanelPanelControls"),
+        ))
+        .with_children(|panel_controls| {
+            panel_settings::spawn_panel_settings(
+                panel_controls,
+                params,
+            );
+        });
 }
