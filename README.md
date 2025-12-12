@@ -12,6 +12,24 @@ This is **not** a full XFoil port yet. It aims to be a practical, visual tool fi
   - **Cp(x)**: upper/lower Cp curves with consistent coloring on the airfoil outline.
   - **Polars**: α sweep showing CL(α) and CDp(α).
   - **Panels**: panel discretization visualization.
+
+## Screenshots
+
+### Field
+
+![Field view](assets/views_img/Field.png)
+
+### Cp(x)
+
+![Cp(x) view](<assets/views_img/Cp(x).png>)
+
+### Polars
+
+![Polars view](assets/views_img/Polars.png)
+
+### Panels
+
+![Panels view](assets/views_img/Panels.png)
 - **Flow settings**
   - Angle of attack α (deg)
   - Reynolds number (×10⁶ input)
