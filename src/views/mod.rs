@@ -1,3 +1,4 @@
+#![cfg(feature = "ui")]
 use bevy::{
     color::palettes::css,
     math::{Mat2, Vec2},
