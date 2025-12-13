@@ -1,3 +1,4 @@
+#![cfg(feature = "ui")]
 mod config;
 mod layout;
 mod style;

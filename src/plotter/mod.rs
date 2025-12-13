@@ -1,3 +1,4 @@
+#![cfg(feature = "ui")]
 use bevy::{
     feathers::constants::fonts,
     prelude::*,

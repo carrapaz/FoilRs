@@ -1,8 +1,10 @@
-use bevy::prelude::*;
+#[cfg(feature = "ui")]
+use bevy::prelude::{Component, Resource};
 use std::f32::consts::PI;
 
 /// Parameters for a NACA 4-digit airfoil.
-#[derive(Resource, Clone)]
+#[cfg_attr(feature = "ui", derive(Resource))]
+#[derive(Clone)]
 pub struct NacaParams {
     /// First digit: maximum camber in % of chord (0–9).
     pub m_digit: f32,
@@ -49,7 +51,8 @@ impl NacaParams {
 }
 
 /// Angle of attack (deg).
-#[derive(Resource, Clone)]
+#[cfg_attr(feature = "ui", derive(Resource))]
+#[derive(Clone)]
 pub struct FlowSettings {
     pub alpha_deg: f32,
     pub reynolds: f32,
@@ -71,7 +74,8 @@ impl Default for FlowSettings {
 }
 
 /// Which visualization we’re showing.
-#[derive(Resource, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "ui", derive(Resource))]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum VisualMode {
     /// Velocity field + streamlines.
     Field,
@@ -84,7 +88,8 @@ pub enum VisualMode {
 }
 
 /// Which value a text cell in the table represents.
-#[derive(Component, Clone, Copy)]
+#[cfg_attr(feature = "ui", derive(Component))]
+#[derive(Clone, Copy)]
 pub enum TableField {
     NacaCode,
     AlphaDeg,

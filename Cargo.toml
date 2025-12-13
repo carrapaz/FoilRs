@@ -3,12 +3,18 @@ name = "FoilRs"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+ui = ["bevy"]
+# default = ["plotter"]
+
 [lib]
 name = "foil_rs"
 path = "src/lib.rs"
 
 [dependencies]
-bevy = { version = "0.17.3", features = ["dynamic_linking","experimental_bevy_feathers"] }
+bevy = { version = "0.17.3", optional=true, features = ["dynamic_linking","experimental_bevy_feathers"] }
+
+bevy_math = "0.17.3"
 
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
 

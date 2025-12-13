@@ -1,12 +1,21 @@
+#[cfg(feature = "ui")]
 use bevy::feathers::{
     FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme,
 };
+#[cfg(feature = "ui")]
 use bevy::prelude::*;
+#[cfg(feature = "ui")]
 use bevy::window::{Window, WindowPlugin, WindowResolution};
 
+#[cfg(feature = "ui")]
+use foil_rs::state::{FlowSettings, NacaParams, VisualMode};
+#[cfg(feature = "ui")]
 use foil_rs::{plotter, state, ui, views};
-use state::{FlowSettings, NacaParams, VisualMode};
 
+#[cfg(not(feature = "ui"))]
+fn main() {}
+
+#[cfg(feature = "ui")]
 fn main() {
     App::new()
         // Black background, like XFoil.
@@ -71,6 +80,7 @@ fn main() {
         .run();
 }
 
+#[cfg(feature = "ui")]
 fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2d);
 }

@@ -1,4 +1,4 @@
-use bevy::math::Vec2;
+use bevy_math::Vec2;
 
 pub(crate) struct Panel {
     pub(crate) start: Vec2,
