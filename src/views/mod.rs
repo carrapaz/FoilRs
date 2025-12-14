@@ -276,8 +276,11 @@ pub fn draw_airfoil_and_visualization(
             );
             if cache.polar_key != Some(key) {
                 cache.polar_key = Some(key);
-                cache.polar_prims =
-                    Some(compute_polar_primitives(&params, &flow));
+                cache.polar_prims = Some(compute_polar_primitives(
+                    &params,
+                    &flow,
+                    cache.panel_system.as_ref(),
+                ));
                 cache.polar_labels_dirty = true;
             }
 

@@ -35,6 +35,24 @@ pub fn compute_polar_sweep(
     alpha_max_deg: f32,
     alpha_step_deg: f32,
 ) -> Vec<PolarRow> {
+    compute_polar_sweep_with_system(
+        params,
+        flow,
+        alpha_min_deg,
+        alpha_max_deg,
+        alpha_step_deg,
+        None,
+    )
+}
+
+pub(crate) fn compute_polar_sweep_with_system(
+    params: &NacaParams,
+    flow: &FlowSettings,
+    alpha_min_deg: f32,
+    alpha_max_deg: f32,
+    alpha_step_deg: f32,
+    system: Option<&PanelLuSystem>,
+) -> Vec<PolarRow> {
     let step = alpha_step_deg.abs().max(1e-3);
     let (a0, a1) = if alpha_min_deg <= alpha_max_deg {
         (alpha_min_deg, alpha_max_deg)
@@ -46,7 +64,14 @@ pub fn compute_polar_sweep(
     let capacity = approx_steps.floor() as usize + 2;
     let mut rows = Vec::with_capacity(capacity);
 
-    let system = PanelLuSystem::new(params);
+    let owned_system;
+    let system = match system {
+        Some(sys) => Some(sys),
+        None => {
+            owned_system = PanelLuSystem::new(params);
+            owned_system.as_ref()
+        }
+    };
 
     for i in 0..capacity {
         let a = a0 + step * i as f32;
