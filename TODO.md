@@ -1,14 +1,16 @@
 ## TODO
 
 ### Next up (code health + scalability)
-- [x] Unify theming: rely on Feathers theme tokens + `ThemeBackgroundColor`/`ThemeBorderColor` instead of spawning hard-coded colors.
-- [x] Remove UI rebuild-on-theme-toggle (preserve UI state like focus/sections; scale to more widgets).
-- [x] Deduplicate common UI “pill button” spawning patterns in `src/ui/layout/topbar.rs`.
 - [ ] (Perf) Allow boundary-layer integration to reuse a scratch buffer / avoid repeated allocations.
 - [ ] Improve headless benchmarking harness (warmup, multi-run stats, optional criterion behind dev-dep).
 - [ ] Consider splitting into `foil_rs_core` + `foil_rs_bevy` crates for long-term scalability (core solver/lib vs UI/app).
 
 ### Completed
+- [x] Unify theming: rely on Feathers theme tokens + `ThemeBackgroundColor`/`ThemeBorderColor` instead of spawning hard-coded colors.
+- [x] Remove UI rebuild-on-theme-toggle (preserve UI state like focus/sections; scale to more widgets).
+- [x] Deduplicate common UI “pill button” spawning patterns in `src/ui/layout/topbar.rs`.
+- [x] Sweep α to generate polars (CL, CDp) with charts and CSV export.
+- [x] Add headless/batch mode for scripted sweeps/CI plus benchmarks for solver performance.
 - [x] Make Bevy optional so `foil_rs` works as a headless library (`--no-default-features`).
 - [x] Add headless examples: `examples/headless.rs`, `examples/bench_headless.rs`, `examples/export_polar_csv.rs`.
 - [x] Move UI-only enums out of `src/state/` (e.g. `VisualMode`, `TableField`) into `src/ui/` so `foil_rs` stays a clean library API.
@@ -36,10 +38,8 @@
 
 ### Essential for a truly useful release
 - [ ] Expand test coverage and reference data (flat plate, symmetric foils, NACA 2412 across α) to keep the solver calibrated.
-- [x] Sweep α to generate polars (CL, CDp) with charts and CSV export.
 - [ ] Support multi-polars across Re/M (multiple curves + CSV) for XFOIL comparison.
 - [ ] Allow importing/saving arbitrary airfoil shapes (e.g., .dat) with cosine spacing and normalization utilities.
-- [x] Add headless/batch mode for scripted sweeps/CI plus benchmarks for solver performance.
 - [ ] UI polish for production use: richer charts (Cp annotations, polar plots), presets/reset, tooltips, run/stop controls.
 - [ ] Support geometry/solver diagnostics: visualize panel discretization (midpoints, normals, circulation) similar to XFOIL.
 - [ ] Unify solver/plot conventions with XFoil (Cp sign/orientation, upper/lower labeling, and whether Re affects Cp).
