@@ -2,7 +2,6 @@ use bevy::{color::palettes::css, prelude::*};
 
 use crate::{
     plotter::{PolarPlotLabels, refresh_polar_labels},
-    solvers,
     state::{FlowSettings, NacaParams},
     views::CHORD_PX,
 };
@@ -31,14 +30,16 @@ pub(super) fn compute_polar_primitives(
     flow: &FlowSettings,
     panel_system: Option<&crate::solvers::panel::PanelLuSystem>,
 ) -> PolarGraphPrimitives {
-    let rows = solvers::compute_polar_sweep_with_system(
-        params,
-        flow,
-        ALPHA_MIN_DEG,
-        ALPHA_MAX_DEG,
-        ALPHA_STEP_DEG,
-        panel_system,
-    );
+    let rows =
+        crate::solvers::polar::compute_polar_sweep_parallel_with_system(
+            params,
+            flow,
+            ALPHA_MIN_DEG,
+            ALPHA_MAX_DEG,
+            ALPHA_STEP_DEG,
+            panel_system,
+            None,
+        );
 
     let mut cl_pts = Vec::with_capacity(rows.len());
     let mut cd_pts = Vec::with_capacity(rows.len());

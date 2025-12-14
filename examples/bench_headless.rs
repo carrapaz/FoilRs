@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use foil_rs::solvers::compute_panel_solution;
 use foil_rs::solvers::compute_polar_sweep;
+use foil_rs::solvers::compute_polar_sweep_parallel_with_threads;
 use foil_rs::state::{FlowSettings, NacaParams};
 
 fn main() {
@@ -43,6 +44,9 @@ fn main() {
         .parse()
         .unwrap_or(0.5);
 
+    let threads: usize =
+        args.next().as_deref().unwrap_or("1").parse().unwrap_or(1);
+
     let mut params = NacaParams::from_naca4(&naca)
         .unwrap_or_else(NacaParams::default);
     params.num_points = 160;
@@ -54,6 +58,7 @@ fn main() {
         "polar_sweep=[{}, {}, {}]",
         alpha_min_deg, alpha_max_deg, alpha_step_deg
     );
+    println!("threads={}", threads);
 
     if panel_iters > 0 {
         let (elapsed, last) =
@@ -77,6 +82,7 @@ fn main() {
             alpha_max_deg,
             alpha_step_deg,
             polar_iters,
+            threads,
         );
         print_stats("polar_sweep", polar_iters, elapsed);
         println!("polar_rows={}", last_len);
@@ -103,17 +109,29 @@ fn time_polar_sweep(
     alpha_max_deg: f32,
     alpha_step_deg: f32,
     iters: usize,
+    threads: usize,
 ) -> (Duration, usize) {
     let mut last_len = 0usize;
     let start = Instant::now();
     for _ in 0..iters {
-        let rows = black_box(compute_polar_sweep(
-            params,
-            flow,
-            alpha_min_deg,
-            alpha_max_deg,
-            alpha_step_deg,
-        ));
+        let rows = if threads <= 1 {
+            black_box(compute_polar_sweep(
+                params,
+                flow,
+                alpha_min_deg,
+                alpha_max_deg,
+                alpha_step_deg,
+            ))
+        } else {
+            black_box(compute_polar_sweep_parallel_with_threads(
+                params,
+                flow,
+                alpha_min_deg,
+                alpha_max_deg,
+                alpha_step_deg,
+                Some(threads),
+            ))
+        };
         last_len = rows.len();
         black_box(&rows);
     }
