@@ -8,12 +8,13 @@ mod topbar;
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
 
-use crate::state::{FlowSettings, NacaParams, VisualMode};
+use crate::state::{FlowSettings, NacaParams};
 
 use super::style;
 use super::types::{
     ExportStatus, LeftPanelMainControls, LeftPanelPanelControls,
     ModePanel, PanelSections, UiColorThemeMode, UiInputMode, UiRoot,
+    VisualMode,
 };
 
 pub fn setup_ui(

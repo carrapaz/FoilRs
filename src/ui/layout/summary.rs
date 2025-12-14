@@ -1,6 +1,6 @@
 use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 
-use crate::state::TableField;
+use crate::ui::types::TableField;
 
 pub(super) fn spawn_summary_panel(
     root: &mut ChildSpawnerCommands<'_>,

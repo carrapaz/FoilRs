@@ -12,9 +12,7 @@ use crate::solvers::{
     BoundaryLayerInputs, compute_panel_solution,
     estimate_boundary_layer,
 };
-use crate::state::{
-    FlowSettings, NacaParams, TableField, VisualMode, cl_thin,
-};
+use crate::state::{FlowSettings, NacaParams, cl_thin};
 
 use super::types::{
     ExportPolarsButton, ExportStatus, ExportStatusText, FlowToggleKind,
@@ -22,8 +20,8 @@ use super::types::{
     LeftPanelPanelControls, ModePanel, NacaHeading, NumericField,
     NumericInput, NumericInputFocus, NumericInputRow, NumericInputText,
     PanelCountText, PanelSections, SectionContent, SectionToggle,
-    ThemeToggleButton, TopBar, UiColorThemeMode, UiInputMode, UiRoot,
-    ViewButton,
+    TableField, ThemeToggleButton, TopBar, UiColorThemeMode,
+    UiInputMode, UiRoot, ViewButton, VisualMode,
 };
 use super::{config, feathers_theme, layout, style};
 use std::path::{Path, PathBuf};

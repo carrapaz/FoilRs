@@ -5,13 +5,13 @@ use bevy::{
     text::{TextColor, TextFont},
 };
 
-use crate::state::{NacaParams, VisualMode};
+use crate::state::NacaParams;
 
 use super::super::style;
 use super::super::types::{
     ExportPolarsButton, ExportStatusText, InputModeButton, NacaHeading,
     ThemeToggleButton, TopBar, UiColorThemeMode, UiInputMode,
-    ViewButton,
+    ViewButton, VisualMode,
 };
 
 const TOP_BAR_HEIGHT: f32 = 56.0;

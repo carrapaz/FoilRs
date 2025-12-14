@@ -99,37 +99,6 @@ impl Default for FlowSettings {
     }
 }
 
-/// Which visualization we’re showing.
-#[cfg_attr(feature = "bevy", derive(Resource))]
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum VisualMode {
-    /// Velocity field + streamlines.
-    Field,
-    /// Cp(x) distribution.
-    Cp,
-    /// Polar curves (CL/CD/CM vs α).
-    Polars,
-    /// Panel discretization visualization.
-    Panels,
-}
-
-/// Which value a text cell in the table represents.
-#[cfg_attr(feature = "bevy", derive(Component))]
-#[derive(Clone, Copy)]
-pub enum TableField {
-    NacaCode,
-    AlphaDeg,
-    Reynolds,
-    Mach,
-    ClThin,
-    RefCl,
-    RefCm,
-    RefCdp,
-    FlowState,
-    ViscosityMode,
-    TransitionMode,
-}
-
 /// Thin airfoil theory: CL ≈ 2π α (α in radians) for small α.
 pub fn cl_thin(alpha_deg: f32) -> f32 {
     let alpha_rad = alpha_deg.to_radians();

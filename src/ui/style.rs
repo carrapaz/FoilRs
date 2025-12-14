@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 
 use crate::solvers::BoundaryLayerResult;
-use crate::state::VisualMode;
 
-use super::types::{FlowToggleKind, PanelSection, UiColorThemeMode};
+use super::types::{
+    FlowToggleKind, PanelSection, UiColorThemeMode, VisualMode,
+};
 
 pub(super) fn panel_base_color(
     mode: VisualMode,

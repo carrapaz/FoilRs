@@ -3,7 +3,8 @@ use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin, WindowResolution};
 
 use foil_rs::{plotter, state, ui, views};
-use state::{FlowSettings, NacaParams, VisualMode};
+use state::{FlowSettings, NacaParams};
+use ui::VisualMode;
 
 fn main() {
     let theme_mode = ui::UiColorThemeMode::default();

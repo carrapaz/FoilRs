@@ -6,7 +6,8 @@ use bevy::{
 
 use crate::airfoil::build_naca_body_geometry;
 use crate::plotter::{CpPlotLabels, PolarPlotLabels};
-use crate::state::{FlowSettings, NacaParams, VisualMode};
+use crate::state::{FlowSettings, NacaParams};
+use crate::ui::VisualMode;
 
 mod cp_view;
 mod field_view;

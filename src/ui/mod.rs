@@ -20,6 +20,6 @@ pub use systems::{
     update_table_text, update_top_bar_tint, update_ui_scale_on_resize,
 };
 pub use types::{
-    ExportStatus, NumericInputFocus, PanelSections, UiColorThemeMode,
-    UiInputMode,
+    ExportStatus, NumericInputFocus, PanelSections, TableField,
+    UiColorThemeMode, UiInputMode, VisualMode,
 };

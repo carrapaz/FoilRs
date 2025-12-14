@@ -1,6 +1,32 @@
 use bevy::prelude::*;
 
-use crate::state::VisualMode;
+#[derive(Resource, Clone, Copy, PartialEq, Eq)]
+pub enum VisualMode {
+    /// Velocity field + streamlines.
+    Field,
+    /// Cp(x) distribution.
+    Cp,
+    /// Polar curves (CL/CD/CM vs α).
+    Polars,
+    /// Panel discretization visualization.
+    Panels,
+}
+
+/// Which value a text cell in the table represents.
+#[derive(Component, Clone, Copy)]
+pub enum TableField {
+    NacaCode,
+    AlphaDeg,
+    Reynolds,
+    Mach,
+    ClThin,
+    RefCl,
+    RefCm,
+    RefCdp,
+    FlowState,
+    ViscosityMode,
+    TransitionMode,
+}
 
 #[derive(Resource, Clone, Copy, PartialEq, Eq)]
 pub enum UiInputMode {
