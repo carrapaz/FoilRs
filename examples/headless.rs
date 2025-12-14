@@ -1,5 +1,6 @@
 use foil_rs::solvers::{
-    BoundaryLayerInputs, compute_panel_solution, estimate_boundary_layer,
+    BoundaryLayerInputs, compute_panel_solution,
+    estimate_boundary_layer,
 };
 use foil_rs::state::{FlowSettings, NacaParams};
 
@@ -13,12 +14,9 @@ fn main() {
         .parse()
         .unwrap_or(4.0);
 
-    let params = parse_naca_4(&naca).unwrap_or_else(|| NacaParams {
-        m_digit: 2.0,
-        p_digit: 4.0,
-        t_digits: 12.0,
-        num_points: 160,
-    });
+    let mut params = NacaParams::from_naca4(&naca)
+        .unwrap_or_else(NacaParams::default);
+    params.num_points = 160;
 
     let flow = FlowSettings {
         alpha_deg,
@@ -29,8 +27,13 @@ fn main() {
     };
 
     let sol = compute_panel_solution(&params, flow.alpha_deg);
-    let bl_inputs =
-        BoundaryLayerInputs::new(flow.reynolds, flow.mach, true, true, 0.05);
+    let bl_inputs = BoundaryLayerInputs::new(
+        flow.reynolds,
+        flow.mach,
+        true,
+        true,
+        0.05,
+    );
     let bl = estimate_boundary_layer(&sol, &bl_inputs);
 
     println!("naca={}", params.code());
@@ -49,20 +52,6 @@ fn main() {
         "transition_lower={}",
         fmt_opt(bl.as_ref().and_then(|b| b.transition_lower))
     );
-}
-
-fn parse_naca_4(code: &str) -> Option<NacaParams> {
-    let code = code.trim();
-    if code.len() != 4 || !code.chars().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
-    let digits: Vec<u32> = code.chars().map(|c| c.to_digit(10).unwrap()).collect();
-    Some(NacaParams {
-        m_digit: digits[0] as f32,
-        p_digit: digits[1] as f32,
-        t_digits: (digits[2] * 10 + digits[3]) as f32,
-        num_points: 160,
-    })
 }
 
 fn fmt_opt(v: Option<f32>) -> String {

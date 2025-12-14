@@ -1,7 +1,7 @@
 pub mod airfoil;
+pub mod math;
 pub mod solvers;
 pub mod state;
-pub mod math;
 
 #[cfg(feature = "bevy")]
 pub mod plotter;

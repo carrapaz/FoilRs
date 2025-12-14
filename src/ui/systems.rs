@@ -94,10 +94,7 @@ pub fn update_top_bar_tint(
         return;
     }
     for mut bg in &mut bars {
-        *bg = BackgroundColor(style::top_bar_color(
-            *mode,
-            *theme_mode,
-        ));
+        *bg = BackgroundColor(style::top_bar_color(*mode, *theme_mode));
     }
 }
 
@@ -454,9 +451,8 @@ pub fn sync_numeric_inputs(
     for (entity, _input, mut bg, mut border) in &mut inputs {
         let focused = focus.active == Some(entity);
         *bg = BackgroundColor(style::input_bg(focused, *theme_mode));
-        *border = BorderColor::all(style::input_border(
-            focused, *theme_mode,
-        ));
+        *border =
+            BorderColor::all(style::input_border(focused, *theme_mode));
     }
 
     for (owner, mut text) in &mut texts {
@@ -749,10 +745,7 @@ pub fn handle_flow_toggle_buttons(
             FlowToggleKind::Viscosity => flow.viscous,
             FlowToggleKind::Transition => flow.free_transition,
         };
-        *bg = BackgroundColor(style::toggle_color(
-            active,
-            *theme_mode,
-        ));
+        *bg = BackgroundColor(style::toggle_color(active, *theme_mode));
 
         if let Some(&child) = children.first() {
             if let Ok(mut text) = texts.get_mut(child) {

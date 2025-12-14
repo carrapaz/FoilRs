@@ -48,6 +48,32 @@ impl NacaParams {
             self.m_digit, self.p_digit, self.t_digits
         )
     }
+
+    /// Parse a 4-digit NACA code (e.g. `"2412"`) into parameters.
+    ///
+    /// Returns `None` if the string is not exactly 4 ASCII digits.
+    pub fn from_naca4(code: &str) -> Option<Self> {
+        let code = code.trim();
+        let bytes = code.as_bytes();
+        if bytes.len() != 4 {
+            return None;
+        }
+        if !bytes.iter().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+
+        let m = (bytes[0] - b'0') as f32;
+        let p = (bytes[1] - b'0') as f32;
+        let t = ((bytes[2] - b'0') as u16 * 10
+            + (bytes[3] - b'0') as u16) as f32;
+
+        Some(Self {
+            m_digit: m,
+            p_digit: p,
+            t_digits: t,
+            ..Self::default()
+        })
+    }
 }
 
 /// Angle of attack (deg).

@@ -1,8 +1,8 @@
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
-use foil_rs::solvers::compute_polar_sweep;
 use foil_rs::solvers::compute_panel_solution;
+use foil_rs::solvers::compute_polar_sweep;
 use foil_rs::state::{FlowSettings, NacaParams};
 
 fn main() {
@@ -21,12 +21,8 @@ fn main() {
         .unwrap_or("2000")
         .parse()
         .unwrap_or(2000);
-    let polar_iters: usize = args
-        .next()
-        .as_deref()
-        .unwrap_or("30")
-        .parse()
-        .unwrap_or(30);
+    let polar_iters: usize =
+        args.next().as_deref().unwrap_or("30").parse().unwrap_or(30);
 
     let alpha_min_deg: f32 = args
         .next()
@@ -47,26 +43,21 @@ fn main() {
         .parse()
         .unwrap_or(0.5);
 
-    let params = parse_naca_4(&naca).unwrap_or_else(|| NacaParams {
-        m_digit: 2.0,
-        p_digit: 4.0,
-        t_digits: 12.0,
-        num_points: 160,
-    });
+    let mut params = NacaParams::from_naca4(&naca)
+        .unwrap_or_else(NacaParams::default);
+    params.num_points = 160;
 
     println!("naca={}", params.code());
     println!("alpha_deg={}", alpha_deg);
-    println!(
-        "panel_iters={} polar_iters={}",
-        panel_iters, polar_iters
-    );
+    println!("panel_iters={} polar_iters={}", panel_iters, polar_iters);
     println!(
         "polar_sweep=[{}, {}, {}]",
         alpha_min_deg, alpha_max_deg, alpha_step_deg
     );
 
     if panel_iters > 0 {
-        let (elapsed, last) = time_panel_solution(&params, alpha_deg, panel_iters);
+        let (elapsed, last) =
+            time_panel_solution(&params, alpha_deg, panel_iters);
         print_stats("panel_solution", panel_iters, elapsed);
         let _ = black_box(last.cl());
     }
@@ -137,19 +128,3 @@ fn print_stats(label: &str, iters: usize, elapsed: Duration) {
         label, total_ms, per_iter_us
     );
 }
-
-fn parse_naca_4(code: &str) -> Option<NacaParams> {
-    let code = code.trim();
-    if code.len() != 4 || !code.chars().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
-    let digits: Vec<u32> =
-        code.chars().map(|c| c.to_digit(10).unwrap()).collect();
-    Some(NacaParams {
-        m_digit: digits[0] as f32,
-        p_digit: digits[1] as f32,
-        t_digits: (digits[2] * 10 + digits[3]) as f32,
-        num_points: 160,
-    })
-}
-

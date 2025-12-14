@@ -42,7 +42,9 @@ pub(super) fn spawn_numeric_input(
                     border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
-                BorderColor::all(style::input_border(false, theme_mode)),
+                BorderColor::all(style::input_border(
+                    false, theme_mode,
+                )),
                 BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
                 BackgroundColor(style::input_bg(false, theme_mode)),
                 Button,

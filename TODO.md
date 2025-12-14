@@ -1,5 +1,18 @@
 ## TODO
 
+### Next up (code health + scalability)
+- [ ] Move UI-only enums out of `src/state/` (e.g. `VisualMode`, `TableField`) into `src/ui/` so `foil_rs` stays a clean library API.
+- [ ] Introduce a cached/factorized panel-system path so polar sweeps reuse geometry/matrix across α (big perf win).
+- [ ] Refactor `compute_polar_sweep` to use deterministic integer steps + `Vec::with_capacity` (avoid float-drift + reallocs).
+- [ ] Unify theming: rely on Feathers theme tokens + `ThemeBackgroundColor`/`ThemeBorderColor` instead of spawning hard-coded colors + respawning UI on theme toggle.
+- [ ] Remove UI rebuild-on-theme-toggle (preserve UI state like focus/sections; scale to more widgets).
+- [ ] Deduplicate common UI “pill button” spawning patterns in `src/ui/layout/topbar.rs`.
+- [ ] Deduplicate NACA parsing logic across examples (move into a shared helper API).
+- [ ] (Perf) Allow boundary-layer integration to reuse a scratch buffer / avoid repeated allocations.
+- [ ] Improve headless benchmarking harness (warmup, multi-run stats, optional criterion behind dev-dep).
+- [ ] Pin dependency versions for reproducibility (`log = "*"`, etc.).
+- [ ] Consider splitting into `foil_rs_core` + `foil_rs_bevy` crates for long-term scalability (core solver/lib vs UI/app).
+
 ### Completed
 - [x] Fix flow arrows so the grid stays fixed but arrow directions align with freestream orientation.
 - [x] Add viewport polish: subtle background grid, small margin around gizmo area.

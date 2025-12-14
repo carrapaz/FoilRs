@@ -41,12 +41,17 @@ pub fn compute_polar_sweep(
         (alpha_max_deg, alpha_min_deg)
     };
 
-    let mut rows = Vec::new();
-    let mut a = a0;
-    while a <= a1 + 1e-6 {
+    let approx_steps = ((a1 - a0) / step).max(0.0);
+    let capacity = approx_steps.floor() as usize + 2;
+    let mut rows = Vec::with_capacity(capacity);
+
+    for i in 0..capacity {
+        let a = a0 + step * i as f32;
+        if a > a1 + 1e-6 {
+            break;
+        }
         let sol = compute_panel_solution(params, a);
         rows.push(polar_row(&sol, flow, a));
-        a += step;
     }
     rows
 }

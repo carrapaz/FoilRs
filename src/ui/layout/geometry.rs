@@ -82,7 +82,7 @@ pub(super) fn spawn_geometry_section(
                 ),
                 InputSlider,
                 observe(slider_self_update),
-            observe(
+                observe(
                     |change: On<ValueChange<f32>>,
                      mut p: ResMut<NacaParams>| {
                         p.m_digit =

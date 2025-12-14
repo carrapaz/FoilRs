@@ -1,6 +1,4 @@
-use bevy::feathers::{
-    FeathersPlugins, theme::UiTheme,
-};
+use bevy::feathers::{FeathersPlugins, theme::UiTheme};
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin, WindowResolution};
 

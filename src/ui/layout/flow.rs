@@ -36,8 +36,7 @@ pub(super) fn spawn_flow_section(
                 ..default()
             },
             BackgroundColor(style::section_header_color(
-                flow_open,
-                theme_mode,
+                flow_open, theme_mode,
             )),
             BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
             Button,

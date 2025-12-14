@@ -1,4 +1,6 @@
-use bevy::feathers::{dark_theme::create_dark_theme, theme::ThemeProps, tokens};
+use bevy::feathers::{
+    dark_theme::create_dark_theme, theme::ThemeProps, tokens,
+};
 use bevy::prelude::Color;
 
 use super::types::UiColorThemeMode;
@@ -34,7 +36,9 @@ fn create_xfoil_mono_theme() -> ThemeProps {
     theme.color.insert(tokens::BUTTON_PRIMARY_BG_PRESSED, bg3);
     theme.color.insert(tokens::BUTTON_PRIMARY_BG_DISABLED, bg1);
     theme.color.insert(tokens::BUTTON_PRIMARY_TEXT, fg);
-    theme.color.insert(tokens::BUTTON_PRIMARY_TEXT_DISABLED, fg_dim);
+    theme
+        .color
+        .insert(tokens::BUTTON_PRIMARY_TEXT_DISABLED, fg_dim);
 
     theme.color.insert(tokens::SLIDER_BG, bg1);
     theme.color.insert(tokens::SLIDER_BAR, fg);
@@ -65,4 +69,3 @@ fn create_xfoil_mono_theme() -> ThemeProps {
 
     theme
 }
-

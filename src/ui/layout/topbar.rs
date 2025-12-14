@@ -10,7 +10,8 @@ use crate::state::{NacaParams, VisualMode};
 use super::super::style;
 use super::super::types::{
     ExportPolarsButton, ExportStatusText, InputModeButton, NacaHeading,
-    ThemeToggleButton, TopBar, UiColorThemeMode, UiInputMode, ViewButton,
+    ThemeToggleButton, TopBar, UiColorThemeMode, UiInputMode,
+    ViewButton,
 };
 
 const TOP_BAR_HEIGHT: f32 = 56.0;
