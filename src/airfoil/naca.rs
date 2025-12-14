@@ -1,6 +1,6 @@
-use bevy::math::Vec2;
 use std::f32::consts::PI;
 
+use crate::math::Vec2;
 use crate::state::NacaParams;
 
 /// Build NACA 4-digit geometry in body coordinates as a closed loop.

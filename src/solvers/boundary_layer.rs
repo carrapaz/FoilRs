@@ -1,4 +1,4 @@
-use bevy::math::Vec2;
+use crate::math::Vec2;
 
 use super::panel::PanelSolution;
 

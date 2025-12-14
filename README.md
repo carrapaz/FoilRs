@@ -67,10 +67,21 @@ If you need “trustworthy XFoil numbers”, use XFoil as the reference. If you 
 
 ## Usage
 
-### Run
+### Run (GUI)
 
 ```bash
 cargo run
+```
+
+### Use as a library (no Bevy)
+
+FoilRs’ solver + geometry code can be used without the Bevy UI by disabling default features:
+
+- In your `Cargo.toml`: `foil_rs = { path = ".../FoilRs", default-features = false }`
+- Or run the included headless example:
+
+```bash
+cargo run --example headless --no-default-features -- 2412 4.0
 ```
 
 ### Controls

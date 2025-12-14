@@ -7,8 +7,18 @@ edition = "2024"
 name = "foil_rs"
 path = "src/lib.rs"
 
+[features]
+default = ["bevy"]
+bevy = ["dep:bevy"]
+
+[[bin]]
+name = "FoilRs"
+path = "src/main.rs"
+required-features = ["bevy"]
+
 [dependencies]
-bevy = { version = "0.17.3", features = ["dynamic_linking","experimental_bevy_feathers"] }
+bevy = { version = "0.17.3", optional = true, features = ["dynamic_linking","experimental_bevy_feathers"] }
+glam = "0.30.9"
 
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
 

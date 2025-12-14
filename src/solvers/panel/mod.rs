@@ -1,6 +1,6 @@
-use bevy::math::Vec2;
 use std::f32::consts::PI;
 
+use crate::math::Vec2;
 use crate::state::NacaParams;
 
 mod geometry;
@@ -31,6 +31,7 @@ pub struct PanelSolution {
     pub(crate) cm_c4_cached: Option<f32>,
 }
 
+#[cfg(any(feature = "bevy", test))]
 pub(crate) struct PanelFlow {
     panels: Vec<Panel>,
     sources: Vec<f32>,
@@ -38,6 +39,7 @@ pub(crate) struct PanelFlow {
     freestream: Vec2,
 }
 
+#[cfg(any(feature = "bevy", test))]
 impl PanelFlow {
     pub(crate) fn velocity_body_pg(
         &self,
@@ -103,6 +105,7 @@ impl PanelSolution {
     }
 }
 
+#[cfg(any(feature = "bevy", test))]
 pub(crate) fn compute_panel_flow(
     params: &NacaParams,
     alpha_deg: f32,
