@@ -30,6 +30,11 @@ This is **not** a full XFoil port yet. It aims to be a practical, visual tool fi
 ### Panels
 
 ![Panels view](assets/views_img/Panels.png)
+
+### Headless mode
+
+![Panels view](assets/views_img/Headless.png)
+
 - **Flow settings**
   - Angle of attack α (deg)
   - Reynolds number (×10⁶ input)
