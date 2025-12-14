@@ -7,7 +7,20 @@ use super::types::UiColorThemeMode;
 
 pub fn theme_props_for(mode: UiColorThemeMode) -> ThemeProps {
     match mode {
-        UiColorThemeMode::Colorful => create_dark_theme(),
+        UiColorThemeMode::Colorful => {
+            let mut theme = create_dark_theme();
+            // Feathers' built-in dark theme doesn't currently define these text tokens,
+            // but our UI uses them for consistent text styling.
+            theme.color.insert(
+                tokens::TEXT_MAIN,
+                Color::srgb(0.92, 0.92, 0.96),
+            );
+            theme.color.insert(
+                tokens::TEXT_DIM,
+                Color::srgb(0.70, 0.70, 0.76),
+            );
+            theme
+        }
         UiColorThemeMode::XFoilMono => create_xfoil_mono_theme(),
     }
 }
@@ -23,6 +36,8 @@ fn create_xfoil_mono_theme() -> ThemeProps {
     let fg_dim = Color::srgb(0.78, 0.78, 0.78);
 
     theme.color.insert(tokens::WINDOW_BG, bg0);
+    theme.color.insert(tokens::TEXT_MAIN, fg);
+    theme.color.insert(tokens::TEXT_DIM, fg_dim);
 
     theme.color.insert(tokens::BUTTON_BG, bg1);
     theme.color.insert(tokens::BUTTON_BG_HOVER, bg2);

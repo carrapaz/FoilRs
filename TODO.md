@@ -1,9 +1,9 @@
 ## TODO
 
 ### Next up (code health + scalability)
-- [ ] Unify theming: rely on Feathers theme tokens + `ThemeBackgroundColor`/`ThemeBorderColor` instead of spawning hard-coded colors + respawning UI on theme toggle.
-- [ ] Remove UI rebuild-on-theme-toggle (preserve UI state like focus/sections; scale to more widgets).
-- [ ] Deduplicate common UI “pill button” spawning patterns in `src/ui/layout/topbar.rs`.
+- [x] Unify theming: rely on Feathers theme tokens + `ThemeBackgroundColor`/`ThemeBorderColor` instead of spawning hard-coded colors.
+- [x] Remove UI rebuild-on-theme-toggle (preserve UI state like focus/sections; scale to more widgets).
+- [x] Deduplicate common UI “pill button” spawning patterns in `src/ui/layout/topbar.rs`.
 - [ ] (Perf) Allow boundary-layer integration to reuse a scratch buffer / avoid repeated allocations.
 - [ ] Improve headless benchmarking harness (warmup, multi-run stats, optional criterion behind dev-dep).
 - [ ] Consider splitting into `foil_rs_core` + `foil_rs_bevy` crates for long-term scalability (core solver/lib vs UI/app).

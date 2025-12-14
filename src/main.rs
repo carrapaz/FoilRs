@@ -47,7 +47,7 @@ fn main() {
             Update,
             (
                 ui::handle_theme_toggle_button,
-                ui::rebuild_ui_on_theme_change,
+                ui::update_theme_toggle_button,
             )
                 .chain(),
         )
@@ -59,8 +59,6 @@ fn main() {
                 views::draw_airfoil_and_visualization,
                 ui::update_table_text,
                 ui::update_naca_heading,
-                ui::update_top_bar_tint,
-                ui::update_mode_panel_tint,
                 ui::update_left_panel_visibility,
                 ui::update_panel_count_text,
                 ui::handle_export_polars_button,

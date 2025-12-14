@@ -1,6 +1,10 @@
 use bevy::{
     ecs::hierarchy::ChildSpawnerCommands,
     feathers::controls::{SliderProps, slider},
+    feathers::{
+        theme::{ThemeBackgroundColor, ThemeFontColor, ThemedText},
+        tokens,
+    },
     prelude::*,
     ui_widgets::{
         SliderPrecision, SliderStep, ValueChange, observe,
@@ -35,21 +39,26 @@ pub(super) fn spawn_geometry_section(
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor(style::section_header_color(
-                geometry_open,
-                theme_mode,
-            )),
+            ThemeBackgroundColor(if geometry_open {
+                tokens::BUTTON_BG_HOVER
+            } else {
+                tokens::BUTTON_BG
+            }),
             BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
+            ThemeFontColor(tokens::TEXT_MAIN),
             Button,
             SectionToggle {
                 section: PanelSection::Geometry,
             },
         ))
         .with_children(|btn| {
-            btn.spawn(Text::new(style::section_header_label(
-                PanelSection::Geometry,
-                geometry_open,
-            )));
+            btn.spawn((
+                Text::new(style::section_header_label(
+                    PanelSection::Geometry,
+                    geometry_open,
+                )),
+                ThemedText,
+            ));
         });
 
     panel

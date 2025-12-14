@@ -6,11 +6,12 @@ mod summary;
 mod topbar;
 
 use bevy::ecs::hierarchy::ChildSpawnerCommands;
+use bevy::feathers::theme::{ThemeBackgroundColor, ThemeBorderColor};
+use bevy::feathers::tokens;
 use bevy::prelude::*;
 
 use crate::state::{FlowSettings, NacaParams};
 
-use super::style;
 use super::types::{
     ExportStatus, LeftPanelMainControls, LeftPanelPanelControls,
     ModePanel, PanelSections, UiColorThemeMode, UiInputMode, UiRoot,
@@ -98,11 +99,9 @@ pub(super) fn spawn_ui_root(
                         border: UiRect::all(Val::Px(1.0)),
                         ..default()
                     },
-                    BorderColor::all(Color::srgb(0.22, 0.22, 0.28)),
+                    ThemeBorderColor(tokens::CHECKBOX_BORDER),
                     BorderRadius::all(Val::Px(14.0)),
-                    BackgroundColor(style::panel_base_color(
-                        mode, theme_mode,
-                    )),
+                    ThemeBackgroundColor(tokens::WINDOW_BG),
                     ModePanel,
                 ))
                 .with_children(|panel| {
@@ -116,7 +115,7 @@ pub(super) fn spawn_ui_root(
                     );
                 });
 
-            summary::spawn_summary_panel(content, theme_mode);
+            summary::spawn_summary_panel(content);
         });
     });
 
@@ -175,7 +174,6 @@ fn spawn_left_panel(
             panel_settings::spawn_panel_settings(
                 panel_controls,
                 params,
-                theme_mode,
             );
         });
 }

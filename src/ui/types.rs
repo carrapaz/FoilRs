@@ -12,6 +12,17 @@ pub enum VisualMode {
     Panels,
 }
 
+impl VisualMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Field => "Field",
+            Self::Cp => "Cp(x)",
+            Self::Polars => "Polars",
+            Self::Panels => "Panels",
+        }
+    }
+}
+
 /// Which value a text cell in the table represents.
 #[derive(Component, Clone, Copy)]
 pub enum TableField {

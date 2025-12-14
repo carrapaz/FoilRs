@@ -1,5 +1,9 @@
 use bevy::prelude::MessageReader;
 use bevy::{
+    feathers::theme::{
+        ThemeBackgroundColor, ThemeBorderColor, ThemeFontColor,
+    },
+    feathers::tokens,
     input::{ButtonInput, keyboard::KeyCode},
     log::{info, warn},
     prelude::*,
@@ -17,13 +21,13 @@ use crate::state::{FlowSettings, NacaParams, cl_thin};
 use super::types::{
     ExportPolarsButton, ExportStatus, ExportStatusText, FlowToggleKind,
     InputModeButton, InputSlider, LeftPanelMainControls,
-    LeftPanelPanelControls, ModePanel, NacaHeading, NumericField,
-    NumericInput, NumericInputFocus, NumericInputRow, NumericInputText,
+    LeftPanelPanelControls, NacaHeading, NumericField, NumericInput,
+    NumericInputFocus, NumericInputRow, NumericInputText,
     PanelCountText, PanelSections, SectionContent, SectionToggle,
-    TableField, ThemeToggleButton, TopBar, UiColorThemeMode,
-    UiInputMode, UiRoot, ViewButton, VisualMode,
+    TableField, ThemeToggleButton, UiColorThemeMode, UiInputMode,
+    ViewButton, VisualMode,
 };
-use super::{config, feathers_theme, layout, style};
+use super::{config, feathers_theme, style};
 use std::path::{Path, PathBuf};
 
 pub fn set_initial_ui_scale(
@@ -68,35 +72,6 @@ pub fn slim_sliders(
     }
 }
 
-pub fn update_mode_panel_tint(
-    mode: Res<VisualMode>,
-    theme_mode: Res<UiColorThemeMode>,
-    mut panels: Query<&mut BackgroundColor, With<ModePanel>>,
-) {
-    if !mode.is_changed() && !theme_mode.is_changed() {
-        return;
-    }
-    for mut bg in &mut panels {
-        *bg = BackgroundColor(style::panel_base_color(
-            *mode,
-            *theme_mode,
-        ));
-    }
-}
-
-pub fn update_top_bar_tint(
-    mode: Res<VisualMode>,
-    theme_mode: Res<UiColorThemeMode>,
-    mut bars: Query<&mut BackgroundColor, With<TopBar>>,
-) {
-    if !mode.is_changed() && !theme_mode.is_changed() {
-        return;
-    }
-    for mut bg in &mut bars {
-        *bg = BackgroundColor(style::top_bar_color(*mode, *theme_mode));
-    }
-}
-
 pub fn handle_theme_toggle_button(
     mut theme_mode: ResMut<UiColorThemeMode>,
     mut theme: ResMut<bevy::feathers::theme::UiTheme>,
@@ -116,41 +91,52 @@ pub fn handle_theme_toggle_button(
     }
 }
 
-pub fn rebuild_ui_on_theme_change(
-    mut commands: Commands,
+pub fn update_theme_toggle_button(
     theme_mode: Res<UiColorThemeMode>,
-    asset_server: Res<AssetServer>,
-    params: Res<NacaParams>,
-    flow: Res<FlowSettings>,
-    mode: Res<VisualMode>,
-    sections: Res<PanelSections>,
-    input_mode: Res<UiInputMode>,
-    export_status: Res<ExportStatus>,
-    mut focus: ResMut<NumericInputFocus>,
-    roots: Query<Entity, With<UiRoot>>,
+    mut commands: Commands,
+    buttons: Query<
+        (
+            Entity,
+            &Children,
+            Option<&ThemeBackgroundColor>,
+            Option<&ThemeFontColor>,
+        ),
+        With<ThemeToggleButton>,
+    >,
+    mut texts: Query<&mut Text>,
 ) {
     if !theme_mode.is_changed() {
         return;
     }
 
-    focus.active = None;
-    focus.buffer.clear();
+    let mono_active = *theme_mode == UiColorThemeMode::XFoilMono;
+    let desired_bg = if mono_active {
+        tokens::BUTTON_PRIMARY_BG
+    } else {
+        tokens::BUTTON_BG
+    };
+    let desired_font = if mono_active {
+        tokens::BUTTON_PRIMARY_TEXT
+    } else {
+        tokens::BUTTON_TEXT
+    };
 
-    for e in &roots {
-        commands.entity(e).despawn();
+    for (entity, children, bg, font) in &buttons {
+        let bg_ok = bg.is_some_and(|t| t.0 == desired_bg);
+        let font_ok = font.is_some_and(|t| t.0 == desired_font);
+        if !bg_ok || !font_ok {
+            commands.entity(entity).insert((
+                ThemeBackgroundColor(desired_bg.clone()),
+                ThemeFontColor(desired_font.clone()),
+            ));
+        }
+
+        if let Some(&child) = children.first() {
+            if let Ok(mut text) = texts.get_mut(child) {
+                text.0 = theme_mode.label().to_string();
+            }
+        }
     }
-
-    let _ = layout::spawn_ui_root(
-        &mut commands,
-        &asset_server,
-        &params,
-        &flow,
-        *mode,
-        &sections,
-        *input_mode,
-        *theme_mode,
-        &export_status,
-    );
 }
 
 pub fn handle_export_polars_button(
@@ -431,13 +417,13 @@ pub fn handle_numeric_input_edit(
 }
 
 pub fn sync_numeric_inputs(
+    mut commands: Commands,
     focus: Res<NumericInputFocus>,
-    theme_mode: Res<UiColorThemeMode>,
     mut inputs: Query<(
         Entity,
         &NumericInput,
-        &mut BackgroundColor,
-        &mut BorderColor,
+        Option<&ThemeBackgroundColor>,
+        Option<&ThemeBorderColor>,
     )>,
     mut texts: Query<(&NumericInputText, &mut Text)>,
     params: Res<NacaParams>,
@@ -447,11 +433,32 @@ pub fn sync_numeric_inputs(
     if *input_mode != UiInputMode::TypeOnly {
         return;
     }
-    for (entity, _input, mut bg, mut border) in &mut inputs {
-        let focused = focus.active == Some(entity);
-        *bg = BackgroundColor(style::input_bg(focused, *theme_mode));
-        *border =
-            BorderColor::all(style::input_border(focused, *theme_mode));
+
+    if focus.is_changed() || input_mode.is_changed() {
+        for (entity, _input, bg, border) in &mut inputs {
+            let focused = focus.active == Some(entity);
+
+            let desired_bg = if focused {
+                tokens::BUTTON_BG_HOVER
+            } else {
+                tokens::BUTTON_BG
+            };
+            let desired_border = if focused {
+                tokens::CHECKBOX_BORDER_HOVER
+            } else {
+                tokens::CHECKBOX_BORDER
+            };
+
+            let bg_ok = bg.is_some_and(|t| t.0 == desired_bg);
+            let border_ok =
+                border.is_some_and(|t| t.0 == desired_border);
+            if !bg_ok || !border_ok {
+                commands.entity(entity).insert((
+                    ThemeBackgroundColor(desired_bg),
+                    ThemeBorderColor(desired_border),
+                ));
+            }
+        }
     }
 
     for (owner, mut text) in &mut texts {
@@ -535,17 +542,38 @@ pub fn handle_input_mode_buttons(
 
 pub fn update_input_mode_button_styles(
     input_mode: Res<UiInputMode>,
-    theme_mode: Res<UiColorThemeMode>,
-    mut q: Query<(&InputModeButton, &mut BackgroundColor)>,
+    mut commands: Commands,
+    mut q: Query<(
+        Entity,
+        &InputModeButton,
+        Option<&ThemeBackgroundColor>,
+        Option<&ThemeFontColor>,
+    )>,
 ) {
-    if !input_mode.is_changed() && !theme_mode.is_changed() {
+    if !input_mode.is_changed() {
         return;
     }
-    for (button, mut bg) in &mut q {
-        *bg = BackgroundColor(style::input_mode_button_color(
-            button.mode == *input_mode,
-            *theme_mode,
-        ));
+    for (entity, button, bg, font) in &mut q {
+        let selected = button.mode == *input_mode;
+        let desired_bg = if selected {
+            tokens::BUTTON_PRIMARY_BG
+        } else {
+            tokens::BUTTON_BG
+        };
+        let desired_font = if selected {
+            tokens::BUTTON_PRIMARY_TEXT
+        } else {
+            tokens::BUTTON_TEXT
+        };
+
+        let bg_ok = bg.is_some_and(|t| t.0 == desired_bg);
+        let font_ok = font.is_some_and(|t| t.0 == desired_font);
+        if !bg_ok || !font_ok {
+            commands.entity(entity).insert((
+                ThemeBackgroundColor(desired_bg),
+                ThemeFontColor(desired_font),
+            ));
+        }
     }
 }
 
@@ -689,34 +717,59 @@ pub struct UiPanelSystemCache {
 
 pub fn handle_view_buttons(
     mut mode: ResMut<VisualMode>,
-    theme_mode: Res<UiColorThemeMode>,
-    mut q: Query<
-        (&Interaction, &mut BackgroundColor, &ViewButton),
-        With<ViewButton>,
-    >,
+    mut commands: Commands,
+    q: Query<(
+        Entity,
+        &Interaction,
+        &ViewButton,
+        Option<&ThemeBackgroundColor>,
+        Option<&ThemeFontColor>,
+    )>,
 ) {
-    for (interaction, mut bg, button) in &mut q {
+    let mut new_mode = *mode;
+    let mut items = Vec::new();
+    for (entity, interaction, button, bg, font) in &q {
         if let Interaction::Pressed = *interaction {
-            *mode = button.mode;
+            new_mode = button.mode;
         }
+        items.push((entity, button.mode, bg, font));
+    }
+    *mode = new_mode;
 
-        *bg = BackgroundColor(style::view_button_color(
-            *mode,
-            button.mode,
-            *theme_mode,
-        ));
+    for (entity, button_mode, bg, font) in items {
+        let selected = *mode == button_mode;
+        let desired_bg = if selected {
+            tokens::BUTTON_PRIMARY_BG
+        } else {
+            tokens::BUTTON_BG
+        };
+        let desired_font = if selected {
+            tokens::BUTTON_PRIMARY_TEXT
+        } else {
+            tokens::BUTTON_TEXT
+        };
+
+        let bg_ok = bg.is_some_and(|t| t.0 == desired_bg);
+        let font_ok = font.is_some_and(|t| t.0 == desired_font);
+        if !bg_ok || !font_ok {
+            commands.entity(entity).insert((
+                ThemeBackgroundColor(desired_bg),
+                ThemeFontColor(desired_font),
+            ));
+        }
     }
 }
 
 pub fn handle_section_toggle_buttons(
     mut sections: ResMut<PanelSections>,
-    theme_mode: Res<UiColorThemeMode>,
+    mut commands: Commands,
     mut q: Query<
         (
+            Entity,
             &Interaction,
-            &mut BackgroundColor,
             &SectionToggle,
             &Children,
+            Option<&ThemeBackgroundColor>,
         ),
         (Changed<Interaction>, With<SectionToggle>),
     >,
@@ -724,16 +777,22 @@ pub fn handle_section_toggle_buttons(
     mut contents: Query<(&SectionContent, &mut Node)>,
 ) {
     let mut any_changed = false;
-    for (interaction, mut bg, toggle, children) in &mut q {
+    for (entity, interaction, toggle, children, bg) in &mut q {
         let mut open = sections.is_open(toggle.section);
         if let Interaction::Pressed = *interaction {
             open = sections.toggle(toggle.section);
             any_changed = true;
         }
-        *bg = BackgroundColor(style::section_header_color(
-            open,
-            *theme_mode,
-        ));
+        let desired_bg = if open {
+            tokens::BUTTON_BG_HOVER
+        } else {
+            tokens::BUTTON_BG
+        };
+        if !bg.is_some_and(|t| t.0 == desired_bg) {
+            commands
+                .entity(entity)
+                .insert(ThemeBackgroundColor(desired_bg));
+        }
 
         if let Some(&child) = children.first() {
             if let Ok(mut text) = texts.get_mut(child) {
@@ -754,19 +813,21 @@ pub fn handle_section_toggle_buttons(
 
 pub fn handle_flow_toggle_buttons(
     mut flow: ResMut<FlowSettings>,
-    theme_mode: Res<UiColorThemeMode>,
+    mut commands: Commands,
     mut q: Query<
         (
+            Entity,
             &Interaction,
-            &mut BackgroundColor,
             &FlowToggleKind,
             &Children,
+            Option<&ThemeBackgroundColor>,
+            Option<&ThemeFontColor>,
         ),
         (Changed<Interaction>, With<FlowToggleKind>),
     >,
     mut texts: Query<&mut Text>,
 ) {
-    for (interaction, mut bg, kind, children) in &mut q {
+    for (entity, interaction, kind, children, bg, font) in &mut q {
         if let Interaction::Pressed = *interaction {
             match kind {
                 FlowToggleKind::Viscosity => {
@@ -782,7 +843,24 @@ pub fn handle_flow_toggle_buttons(
             FlowToggleKind::Viscosity => flow.viscous,
             FlowToggleKind::Transition => flow.free_transition,
         };
-        *bg = BackgroundColor(style::toggle_color(active, *theme_mode));
+        let desired_bg = if active {
+            tokens::BUTTON_PRIMARY_BG
+        } else {
+            tokens::BUTTON_BG
+        };
+        let desired_font = if active {
+            tokens::BUTTON_PRIMARY_TEXT
+        } else {
+            tokens::BUTTON_TEXT
+        };
+        let bg_ok = bg.is_some_and(|t| t.0 == desired_bg);
+        let font_ok = font.is_some_and(|t| t.0 == desired_font);
+        if !bg_ok || !font_ok {
+            commands.entity(entity).insert((
+                ThemeBackgroundColor(desired_bg),
+                ThemeFontColor(desired_font),
+            ));
+        }
 
         if let Some(&child) = children.first() {
             if let Ok(mut text) = texts.get_mut(child) {

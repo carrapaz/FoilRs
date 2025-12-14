@@ -1,13 +1,19 @@
 use bevy::{
     ecs::hierarchy::ChildSpawnerCommands,
-    feathers::constants::fonts,
+    feathers::{
+        constants::fonts,
+        theme::{
+            ThemeBackgroundColor, ThemeBorderColor, ThemeFontColor,
+            ThemedText,
+        },
+        tokens,
+    },
     prelude::*,
-    text::{TextColor, TextFont},
+    text::TextFont,
 };
 
 use crate::state::NacaParams;
 
-use super::super::style;
 use super::super::types::{
     ExportPolarsButton, ExportStatusText, InputModeButton, NacaHeading,
     ThemeToggleButton, TopBar, UiColorThemeMode, UiInputMode,
@@ -36,8 +42,8 @@ pub(super) fn spawn_top_bar(
             align_items: AlignItems::Center,
             ..default()
         },
-        BorderColor::all(Color::srgb(0.18, 0.18, 0.22)),
-        BackgroundColor(style::top_bar_color(mode, theme_mode)),
+        ThemeBorderColor(tokens::CHECKBOX_BORDER),
+        ThemeBackgroundColor(tokens::WINDOW_BG),
         TopBar,
     ))
     .with_children(|bar| {
@@ -45,12 +51,15 @@ pub(super) fn spawn_top_bar(
         let ui_font = asset_server.load(fonts::REGULAR);
         let mono_font = asset_server.load(fonts::MONO);
 
-        bar.spawn(Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Baseline,
-            column_gap: Val::Px(12.0),
-            ..default()
-        })
+        bar.spawn((
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Baseline,
+                column_gap: Val::Px(12.0),
+                ..default()
+            },
+            ThemeFontColor(tokens::TEXT_MAIN),
+        ))
         .with_children(|left| {
             left.spawn((
                 Text::new("FoilRs"),
@@ -59,19 +68,25 @@ pub(super) fn spawn_top_bar(
                     font_size: 18.0,
                     ..default()
                 },
-                TextColor(Color::srgb(0.92, 0.92, 0.96)),
+                ThemedText,
             ));
 
             left.spawn((
-                Text::new(params.code()),
-                NacaHeading,
-                TextFont {
-                    font: mono_font,
-                    font_size: 14.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.72, 0.72, 0.78)),
-            ));
+                Node::default(),
+                ThemeFontColor(tokens::TEXT_DIM),
+            ))
+            .with_children(|dim| {
+                dim.spawn((
+                    Text::new(params.code()),
+                    NacaHeading,
+                    TextFont {
+                        font: mono_font,
+                        font_size: 14.0,
+                        ..default()
+                    },
+                    ThemedText,
+                ));
+            });
         });
 
         bar.spawn(Node {
@@ -81,15 +96,14 @@ pub(super) fn spawn_top_bar(
             ..default()
         })
         .with_children(|tabs| {
-            tabs.spawn((
-                Text::new("View"),
-                TextFont {
-                    font: ui_font.clone(),
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.70, 0.70, 0.76)),
-            ));
+            spawn_themed_text(
+                tabs,
+                "View",
+                ui_font.clone(),
+                13.0,
+                tokens::TEXT_DIM,
+                (),
+            );
 
             for &view in &[
                 VisualMode::Field,
@@ -97,47 +111,23 @@ pub(super) fn spawn_top_bar(
                 VisualMode::Polars,
                 VisualMode::Panels,
             ] {
-                tabs.spawn((
-                    Node {
-                        padding: UiRect::axes(
-                            Val::Px(12.0),
-                            Val::Px(8.0),
-                        ),
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    BorderColor::all(Color::srgb(0.25, 0.25, 0.32)),
-                    BorderRadius::all(Val::Px(999.0)),
-                    BackgroundColor(style::view_button_color(
-                        mode, view, theme_mode,
-                    )),
-                    Button,
+                spawn_pill_button(
+                    tabs,
+                    view.label(),
+                    ui_font.clone(),
+                    mode == view,
                     ViewButton { mode: view },
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new(
-                            style::view_button_label(view).to_string(),
-                        ),
-                        TextFont {
-                            font: ui_font.clone(),
-                            font_size: 13.0,
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.86, 0.86, 0.92)),
-                    ));
-                });
+                );
             }
 
-            tabs.spawn((
-                Text::new("Inputs"),
-                TextFont {
-                    font: ui_font.clone(),
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.70, 0.70, 0.76)),
-            ));
+            spawn_themed_text(
+                tabs,
+                "Inputs",
+                ui_font.clone(),
+                13.0,
+                tokens::TEXT_DIM,
+                (),
+            );
 
             for &mode_option in
                 &[UiInputMode::SliderOnly, UiInputMode::TypeOnly]
@@ -146,36 +136,13 @@ pub(super) fn spawn_top_bar(
                     UiInputMode::SliderOnly => "Slider",
                     UiInputMode::TypeOnly => "Type",
                 };
-
-                tabs.spawn((
-                    Node {
-                        padding: UiRect::axes(
-                            Val::Px(12.0),
-                            Val::Px(8.0),
-                        ),
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    BorderColor::all(Color::srgb(0.25, 0.25, 0.32)),
-                    BorderRadius::all(Val::Px(999.0)),
-                    BackgroundColor(style::input_mode_button_color(
-                        mode_option == input_mode,
-                        theme_mode,
-                    )),
-                    Button,
+                spawn_pill_button(
+                    tabs,
+                    label,
+                    ui_font.clone(),
+                    mode_option == input_mode,
                     InputModeButton { mode: mode_option },
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new(label.to_string()),
-                        TextFont {
-                            font: ui_font.clone(),
-                            font_size: 13.0,
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.86, 0.86, 0.92)),
-                    ));
-                });
+                );
             }
         });
 
@@ -186,77 +153,95 @@ pub(super) fn spawn_top_bar(
             ..default()
         })
         .with_children(|right| {
-            right
-                .spawn((
-                    Node {
-                        padding: UiRect::axes(
-                            Val::Px(12.0),
-                            Val::Px(8.0),
-                        ),
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    BorderColor::all(Color::srgb(0.25, 0.25, 0.32)),
-                    BorderRadius::all(Val::Px(999.0)),
-                    BackgroundColor(style::top_right_button_color(
-                        theme_mode == UiColorThemeMode::XFoilMono,
-                        theme_mode,
-                    )),
-                    Button,
-                    ThemeToggleButton,
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new(theme_mode.label().to_string()),
-                        TextFont {
-                            font: ui_font.clone(),
-                            font_size: 13.0,
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.86, 0.86, 0.92)),
-                    ));
-                });
+            let mono_active = theme_mode == UiColorThemeMode::XFoilMono;
+            spawn_pill_button(
+                right,
+                theme_mode.label(),
+                ui_font.clone(),
+                mono_active,
+                ThemeToggleButton,
+            );
 
-            right
-                .spawn((
-                    Node {
-                        padding: UiRect::axes(
-                            Val::Px(12.0),
-                            Val::Px(8.0),
-                        ),
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    BorderColor::all(Color::srgb(0.25, 0.25, 0.32)),
-                    BorderRadius::all(Val::Px(999.0)),
-                    BackgroundColor(style::top_right_button_color(
-                        false, theme_mode,
-                    )),
-                    Button,
-                    ExportPolarsButton,
-                ))
-                .with_children(|btn| {
-                    btn.spawn((
-                        Text::new("Export CSV".to_string()),
-                        TextFont {
-                            font: ui_font.clone(),
-                            font_size: 13.0,
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.86, 0.86, 0.92)),
-                    ));
-                });
+            spawn_pill_button(
+                right,
+                "Export CSV",
+                ui_font.clone(),
+                false,
+                ExportPolarsButton,
+            );
 
-            let _ = right.spawn((
-                Text::new(export_status.to_string()),
+            spawn_themed_text(
+                right,
+                export_status,
+                ui_font.clone(),
+                12.0,
+                tokens::TEXT_DIM,
                 ExportStatusText,
-                TextFont {
-                    font: ui_font.clone(),
-                    font_size: 12.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.65, 0.65, 0.72)),
-            ));
+            );
         });
     });
+}
+
+fn spawn_pill_button<B: Bundle>(
+    parent: &mut ChildSpawnerCommands<'_>,
+    label: impl Into<String>,
+    font: Handle<Font>,
+    selected: bool,
+    extra: B,
+) {
+    let (bg, fg) = if selected {
+        (tokens::BUTTON_PRIMARY_BG, tokens::BUTTON_PRIMARY_TEXT)
+    } else {
+        (tokens::BUTTON_BG, tokens::BUTTON_TEXT)
+    };
+
+    parent
+        .spawn((
+            Node {
+                padding: UiRect::axes(Val::Px(12.0), Val::Px(8.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            ThemeBorderColor(tokens::CHECKBOX_BORDER),
+            BorderRadius::all(Val::Px(999.0)),
+            ThemeBackgroundColor(bg),
+            ThemeFontColor(fg),
+            Button,
+            extra,
+        ))
+        .with_children(|btn| {
+            btn.spawn((
+                Text::new(label.into()),
+                TextFont {
+                    font,
+                    font_size: 13.0,
+                    ..default()
+                },
+                ThemedText,
+            ));
+        });
+}
+
+fn spawn_themed_text<B: Bundle>(
+    parent: &mut ChildSpawnerCommands<'_>,
+    text: impl Into<String>,
+    font: Handle<Font>,
+    font_size: f32,
+    color: bevy::feathers::theme::ThemeToken,
+    extra: B,
+) {
+    parent
+        .spawn((Node::default(), ThemeFontColor(color)))
+        .with_children(|node| {
+            node.spawn((
+                Text::new(text.into()),
+                TextFont {
+                    font,
+                    font_size,
+                    ..default()
+                },
+                ThemedText,
+                extra,
+            ));
+        });
 }

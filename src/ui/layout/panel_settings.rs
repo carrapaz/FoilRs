@@ -1,6 +1,10 @@
 use bevy::{
     ecs::hierarchy::ChildSpawnerCommands,
     feathers::controls::{SliderProps, slider},
+    feathers::{
+        theme::{ThemeBackgroundColor, ThemeFontColor, ThemedText},
+        tokens,
+    },
     prelude::*,
     ui_widgets::{
         SliderPrecision, SliderStep, ValueChange, observe,
@@ -12,24 +16,11 @@ use crate::{airfoil::build_naca_body_geometry, state::NacaParams};
 
 use super::super::config;
 use super::super::types::PanelCountText;
-use super::super::types::UiColorThemeMode;
 
 pub(super) fn spawn_panel_settings(
     panel: &mut ChildSpawnerCommands<'_>,
     params: &NacaParams,
-    theme_mode: UiColorThemeMode,
 ) {
-    let (hint_color, note_bg) = match theme_mode {
-        UiColorThemeMode::Colorful => (
-            Color::srgb(0.70, 0.70, 0.76),
-            Color::srgb(0.12, 0.12, 0.16),
-        ),
-        UiColorThemeMode::XFoilMono => (
-            Color::srgb(0.85, 0.85, 0.85),
-            Color::srgb(0.04, 0.04, 0.04),
-        ),
-    };
-
     panel
         .spawn(Node {
             width: Val::Percent(100.0),
@@ -65,11 +56,17 @@ pub(super) fn spawn_panel_settings(
             ));
 
             root.spawn((
-                Text::new(
-                    "Tip: fewer panels makes polars much faster.",
-                ),
-                TextColor(hint_color),
-            ));
+                Node::default(),
+                ThemeFontColor(tokens::TEXT_DIM),
+            ))
+            .with_children(|dim| {
+                dim.spawn((
+                    Text::new(
+                        "Tip: fewer panels makes polars much faster.",
+                    ),
+                    ThemedText,
+                ));
+            });
 
             root.spawn((
                 Node {
@@ -77,12 +74,14 @@ pub(super) fn spawn_panel_settings(
                     padding: UiRect::axes(Val::Px(8.0), Val::Px(6.0)),
                     ..default()
                 },
-                BackgroundColor(note_bg),
+                ThemeBackgroundColor(tokens::BUTTON_BG),
                 BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
+                ThemeFontColor(tokens::TEXT_MAIN),
             ))
             .with_children(|note| {
-                note.spawn(Text::new(
-                    "Panels view shows discretization only.",
+                note.spawn((
+                    Text::new("Panels view shows discretization only."),
+                    ThemedText,
                 ));
             });
         });

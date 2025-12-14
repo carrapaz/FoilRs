@@ -12,12 +12,12 @@ pub use systems::{
     handle_input_mode_buttons, handle_numeric_input_edit,
     handle_numeric_input_focus, handle_section_toggle_buttons,
     handle_theme_toggle_button, handle_view_buttons,
-    rebuild_ui_on_theme_change, set_initial_ui_scale, slim_sliders,
-    sync_numeric_inputs, update_export_status_text,
-    update_input_mode_button_styles, update_left_panel_visibility,
-    update_mode_panel_tint, update_naca_heading,
+    set_initial_ui_scale, slim_sliders, sync_numeric_inputs,
+    update_export_status_text, update_input_mode_button_styles,
+    update_left_panel_visibility, update_naca_heading,
     update_numeric_input_visibility, update_panel_count_text,
-    update_table_text, update_top_bar_tint, update_ui_scale_on_resize,
+    update_table_text, update_theme_toggle_button,
+    update_ui_scale_on_resize,
 };
 pub use types::{
     ExportStatus, NumericInputFocus, PanelSections, TableField,

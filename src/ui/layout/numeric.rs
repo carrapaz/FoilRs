@@ -1,19 +1,26 @@
 use bevy::{
     ecs::hierarchy::ChildSpawnerCommands,
     feathers::constants::fonts,
+    feathers::{
+        theme::{
+            ThemeBackgroundColor, ThemeBorderColor, ThemeFontColor,
+            ThemedText,
+        },
+        tokens,
+    },
     prelude::*,
-    text::{TextColor, TextFont},
+    text::TextFont,
 };
 
+use super::super::config;
 use super::super::types::{
     NumericField, NumericInput, NumericInputRow, NumericInputText,
 };
-use super::super::{config, style};
 
 pub(super) fn spawn_numeric_input(
     parent: &mut ChildSpawnerCommands<'_>,
     asset_server: &AssetServer,
-    theme_mode: super::super::types::UiColorThemeMode,
+    _theme_mode: super::super::types::UiColorThemeMode,
     field: NumericField,
     initial_text: String,
     min: f32,
@@ -42,11 +49,10 @@ pub(super) fn spawn_numeric_input(
                     border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
-                BorderColor::all(style::input_border(
-                    false, theme_mode,
-                )),
+                ThemeBorderColor(tokens::CHECKBOX_BORDER),
                 BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
-                BackgroundColor(style::input_bg(false, theme_mode)),
+                ThemeBackgroundColor(tokens::BUTTON_BG),
+                ThemeFontColor(tokens::TEXT_MAIN),
                 Button,
                 NumericInput {
                     field,
@@ -66,7 +72,7 @@ pub(super) fn spawn_numeric_input(
                         font_size: 13.0,
                         ..default()
                     },
-                    TextColor(Color::srgb(0.88, 0.88, 0.92)),
+                    ThemedText,
                 ));
             });
         });

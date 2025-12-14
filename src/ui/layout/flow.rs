@@ -1,6 +1,10 @@
 use bevy::{
     ecs::hierarchy::ChildSpawnerCommands,
     feathers::controls::{SliderProps, slider},
+    feathers::{
+        theme::{ThemeBackgroundColor, ThemeFontColor, ThemedText},
+        tokens,
+    },
     prelude::*,
     ui_widgets::{
         SliderPrecision, SliderStep, ValueChange, observe,
@@ -35,20 +39,26 @@ pub(super) fn spawn_flow_section(
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor(style::section_header_color(
-                flow_open, theme_mode,
-            )),
+            ThemeBackgroundColor(if flow_open {
+                tokens::BUTTON_BG_HOVER
+            } else {
+                tokens::BUTTON_BG
+            }),
             BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
+            ThemeFontColor(tokens::TEXT_MAIN),
             Button,
             SectionToggle {
                 section: PanelSection::Flow,
             },
         ))
         .with_children(|btn| {
-            btn.spawn(Text::new(style::section_header_label(
-                PanelSection::Flow,
-                flow_open,
-            )));
+            btn.spawn((
+                Text::new(style::section_header_label(
+                    PanelSection::Flow,
+                    flow_open,
+                )),
+                ThemedText,
+            ));
         });
 
     panel
@@ -176,21 +186,30 @@ pub(super) fn spawn_flow_section(
                         align_items: AlignItems::Center,
                         ..default()
                     },
-                    BackgroundColor(style::toggle_color(
-                        flow.viscous,
-                        theme_mode,
-                    )),
+                    ThemeBackgroundColor(if flow.viscous {
+                        tokens::BUTTON_PRIMARY_BG
+                    } else {
+                        tokens::BUTTON_BG
+                    }),
                     BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
+                    ThemeFontColor(if flow.viscous {
+                        tokens::BUTTON_PRIMARY_TEXT
+                    } else {
+                        tokens::BUTTON_TEXT
+                    }),
                     Button,
                     FlowToggleKind::Viscosity,
                 ))
                 .with_children(|btn| {
-                    btn.spawn(Text::new(
-                        style::flow_toggle_label(
-                            FlowToggleKind::Viscosity,
-                            flow.viscous,
-                        )
-                        .to_string(),
+                    btn.spawn((
+                        Text::new(
+                            style::flow_toggle_label(
+                                FlowToggleKind::Viscosity,
+                                flow.viscous,
+                            )
+                            .to_string(),
+                        ),
+                        ThemedText,
                     ));
                 });
 
@@ -207,21 +226,30 @@ pub(super) fn spawn_flow_section(
                         align_items: AlignItems::Center,
                         ..default()
                     },
-                    BackgroundColor(style::toggle_color(
-                        flow.free_transition,
-                        theme_mode,
-                    )),
+                    ThemeBackgroundColor(if flow.free_transition {
+                        tokens::BUTTON_PRIMARY_BG
+                    } else {
+                        tokens::BUTTON_BG
+                    }),
                     BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
+                    ThemeFontColor(if flow.free_transition {
+                        tokens::BUTTON_PRIMARY_TEXT
+                    } else {
+                        tokens::BUTTON_TEXT
+                    }),
                     Button,
                     FlowToggleKind::Transition,
                 ))
                 .with_children(|btn| {
-                    btn.spawn(Text::new(
-                        style::flow_toggle_label(
-                            FlowToggleKind::Transition,
-                            flow.free_transition,
-                        )
-                        .to_string(),
+                    btn.spawn((
+                        Text::new(
+                            style::flow_toggle_label(
+                                FlowToggleKind::Transition,
+                                flow.free_transition,
+                            )
+                            .to_string(),
+                        ),
+                        ThemedText,
                     ));
                 });
         });
