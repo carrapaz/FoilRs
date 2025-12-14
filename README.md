@@ -97,7 +97,17 @@ Quick timing harness (no extra deps), recommended in `--release`:
 cargo run --example bench_headless --no-default-features --release -- 2412 4.0
 ```
 
-Args (all optional): `NACA ALPHA_DEG PANEL_ITERS POLAR_ITERS ALPHA_MIN ALPHA_MAX ALPHA_STEP`
+Args (all optional): `NACA ALPHA_DEG PANEL_ITERS POLAR_ITERS ALPHA_MIN ALPHA_MAX ALPHA_STEP THREADS`
+
+### Export polars CSV (headless)
+
+Writes an α-sweep CSV to `exports/` (no Bevy required):
+
+```bash
+cargo run --example export_polar_csv --no-default-features --release -- 2412
+```
+
+Args (all optional): `NACA REYNOLDS MACH VISCOUS FREE_TRANSITION ALPHA_MIN ALPHA_MAX ALPHA_STEP THREADS OUT_PATH`
 
 ### Controls
 
