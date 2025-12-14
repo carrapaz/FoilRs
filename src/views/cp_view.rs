@@ -37,10 +37,15 @@ pub(super) fn compute_cp_graph_primitives(
     flow: &FlowSettings,
     base_y: f32,
     scale_y: f32,
+    panel_system: Option<&crate::solvers::panel::PanelLuSystem>,
 ) -> Option<CpGraphPrimitives> {
     // Use the more stable analytic approximation for visualization; the
     // panel solver can be noisier for Cp curves.
-    let sol = solvers::compute_panel_solution(params, flow.alpha_deg);
+    let sol = panel_system
+        .map(|sys| sys.panel_solution(params, flow.alpha_deg))
+        .unwrap_or_else(|| {
+            solvers::compute_panel_solution(params, flow.alpha_deg)
+        });
     if sol.x.is_empty() {
         return None;
     }

@@ -1,5 +1,6 @@
 use crate::state::{FlowSettings, NacaParams};
 
+use super::panel::PanelLuSystem;
 use super::{
     BoundaryLayerInputs, PanelSolution, compute_panel_solution,
     estimate_boundary_layer,
@@ -45,12 +46,17 @@ pub fn compute_polar_sweep(
     let capacity = approx_steps.floor() as usize + 2;
     let mut rows = Vec::with_capacity(capacity);
 
+    let system = PanelLuSystem::new(params);
+
     for i in 0..capacity {
         let a = a0 + step * i as f32;
         if a > a1 + 1e-6 {
             break;
         }
-        let sol = compute_panel_solution(params, a);
+        let sol = system
+            .as_ref()
+            .map(|sys| sys.panel_solution(params, a))
+            .unwrap_or_else(|| compute_panel_solution(params, a));
         rows.push(polar_row(&sol, flow, a));
     }
     rows

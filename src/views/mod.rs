@@ -57,6 +57,8 @@ pub struct VizCache {
     body_world_alpha_bits: Option<u32>,
     body_world: Vec<Vec2>,
 
+    panel_system: Option<crate::solvers::panel::PanelLuSystem>,
+
     field_key: Option<(NacaKey, u32, u32, u32, bool)>,
     field_prims: FieldPrimitives,
 
@@ -91,6 +93,8 @@ pub fn draw_airfoil_and_visualization(
     if cache.naca_key != Some(naca_key) {
         cache.naca_key = Some(naca_key);
         cache.body = build_naca_body_geometry(&params);
+        cache.panel_system =
+            crate::solvers::panel::PanelLuSystem::new(&params);
         cache.body_world_alpha_bits = None;
         cache.field_key = None;
         cache.panel_key = None;
@@ -197,9 +201,9 @@ pub fn draw_airfoil_and_visualization(
             );
             if cache.field_key != Some(key) {
                 let prims = compute_field_primitives(
-                    &params,
                     &flow,
                     &cache.body,
+                    cache.panel_system.as_ref(),
                 );
                 cache.field_key = Some(key);
                 cache.field_prims = prims;
@@ -225,7 +229,11 @@ pub fn draw_airfoil_and_visualization(
             if cache.cp_key != Some(key) {
                 cache.cp_key = Some(key);
                 cache.cp_prims = compute_cp_graph_primitives(
-                    &params, &flow, base_y, scale_y,
+                    &params,
+                    &flow,
+                    base_y,
+                    scale_y,
+                    cache.panel_system.as_ref(),
                 );
             }
 

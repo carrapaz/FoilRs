@@ -31,32 +31,6 @@ pub struct PanelSolution {
     pub(crate) cm_c4_cached: Option<f32>,
 }
 
-#[cfg(any(feature = "bevy", test))]
-pub(crate) struct PanelFlow {
-    panels: Vec<Panel>,
-    sources: Vec<f32>,
-    gamma: f32,
-    freestream: Vec2,
-}
-
-#[cfg(any(feature = "bevy", test))]
-impl PanelFlow {
-    pub(crate) fn velocity_body_pg(
-        &self,
-        point: Vec2,
-        mach: f32,
-    ) -> Vec2 {
-        let beta = (1.0 - mach * mach).clamp(0.05, 1.0).sqrt();
-        let induced = induced_velocity_from_solution(
-            point,
-            &self.panels,
-            &self.sources,
-            self.gamma,
-        );
-        self.freestream + induced / beta
-    }
-}
-
 impl PanelSolution {
     /// Approximate section lift coefficient by integrating Cp difference.
     pub fn cl(&self) -> Option<f32> {
@@ -105,36 +79,131 @@ impl PanelSolution {
     }
 }
 
+pub(crate) struct PanelLuSystem {
+    panels: Vec<Panel>,
+    lu: Vec<f32>,
+    pivots: Vec<usize>,
+    size: usize,
+    upper_dir: Vec2,
+    lower_dir: Vec2,
+}
+
 #[cfg(any(feature = "bevy", test))]
-pub(crate) fn compute_panel_flow(
-    params: &NacaParams,
-    alpha_deg: f32,
-) -> Option<PanelFlow> {
-    let alpha_rad = alpha_deg.to_radians();
-    let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
+pub(crate) struct PanelFlow<'a> {
+    panels: &'a [Panel],
+    sources: Vec<f32>,
+    gamma: f32,
+    freestream: Vec2,
+}
 
-    let geometry = build_naca_body_geometry(params);
-    let panels = build_panels(&geometry);
-    if panels.len() < 4 {
-        return None;
+#[cfg(any(feature = "bevy", test))]
+impl PanelFlow<'_> {
+    pub(crate) fn velocity_body_pg(
+        &self,
+        point: Vec2,
+        mach: f32,
+    ) -> Vec2 {
+        let beta = (1.0 - mach * mach).clamp(0.05, 1.0).sqrt();
+        let induced = induced_velocity_from_solution(
+            point,
+            self.panels,
+            &self.sources,
+            self.gamma,
+        );
+        self.freestream + induced / beta
+    }
+}
+
+impl PanelLuSystem {
+    pub(crate) fn new(params: &NacaParams) -> Option<Self> {
+        let geometry = build_naca_body_geometry(params);
+        let panels = build_panels(&geometry);
+        if panels.len() < 4 {
+            return None;
+        }
+
+        let (matrix, size, upper_dir, lower_dir) =
+            assemble_matrix(&panels);
+        let (lu, pivots) = lu_factorize(&matrix, size)?;
+
+        Some(Self {
+            panels,
+            lu,
+            pivots,
+            size,
+            upper_dir,
+            lower_dir,
+        })
     }
 
-    let system = assemble_system(&panels, freestream);
-    let strengths = solve_linear_system(system);
-    if strengths.len() != panels.len() + 1 {
-        return None;
+    #[cfg(any(feature = "bevy", test))]
+    pub(crate) fn solve_flow(
+        &self,
+        alpha_deg: f32,
+    ) -> Option<PanelFlow<'_>> {
+        let alpha_rad = alpha_deg.to_radians();
+        let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
+        let (sources, gamma) = self.solve(freestream)?;
+        Some(PanelFlow {
+            panels: &self.panels,
+            sources,
+            gamma,
+            freestream,
+        })
     }
 
-    let n_panels = panels.len();
-    let gamma = strengths[n_panels];
-    let sources = strengths[..n_panels].to_vec();
+    pub(crate) fn solve(
+        &self,
+        freestream: Vec2,
+    ) -> Option<(Vec<f32>, f32)> {
+        let rhs = assemble_rhs(
+            &self.panels,
+            freestream,
+            self.upper_dir,
+            self.lower_dir,
+        );
+        let strengths =
+            lu_solve(&self.lu, &self.pivots, &rhs, self.size)?;
+        if strengths.len() != self.size {
+            return None;
+        }
+        let n_panels = self.panels.len();
+        let gamma = strengths[n_panels];
+        let sources = strengths[..n_panels].to_vec();
+        Some((sources, gamma))
+    }
 
-    Some(PanelFlow {
-        panels,
-        sources,
-        gamma,
-        freestream,
-    })
+    pub(crate) fn panel_solution(
+        &self,
+        params: &NacaParams,
+        alpha_deg: f32,
+    ) -> PanelSolution {
+        let alpha_rad = alpha_deg.to_radians();
+        let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
+
+        let Some((sources, gamma)) = self.solve(freestream) else {
+            let (cl, cm_c4, _) =
+                analytic_section_coeffs(params, alpha_deg);
+            return PanelSolution {
+                x: Vec::new(),
+                cp_upper: Vec::new(),
+                cp_lower: Vec::new(),
+                upper_coords: Vec::new(),
+                lower_coords: Vec::new(),
+                cl_cached: Some(cl),
+                cm_c4_cached: Some(cm_c4),
+            };
+        };
+
+        build_panel_solution_from_strengths(
+            params,
+            alpha_deg,
+            freestream,
+            &self.panels,
+            &sources,
+            gamma,
+        )
+    }
 }
 
 /// Heuristic section coefficients (thin-airfoil-inspired) to provide stable
@@ -165,10 +234,6 @@ pub fn compute_panel_solution(
     params: &NacaParams,
     alpha_deg: f32,
 ) -> PanelSolution {
-    let sample_count = (params.num_points / 2).max(32);
-    let m = params.m();
-    let p = params.p();
-    let t = params.t();
     let alpha_rad = alpha_deg.to_radians();
 
     // Freestream in body coordinates; visualization rotates the airfoil in world
@@ -210,7 +275,43 @@ pub fn compute_panel_solution(
     let n_panels = panels.len();
     let gamma = strengths[n_panels];
     let source_strengths = strengths[..n_panels].to_vec();
-    let sources = &source_strengths;
+    build_panel_solution_from_strengths(
+        params,
+        alpha_deg,
+        freestream,
+        &panels,
+        &source_strengths,
+        gamma,
+    )
+}
+
+/// Quick analytic fallback (old toy model) used for visualization when the
+/// full panel solution is too noisy for Cp plotting.
+pub fn compute_cp_approx(
+    params: &NacaParams,
+    alpha_deg: f32,
+) -> PanelSolution {
+    compute_fallback_solution(params, alpha_deg)
+}
+
+struct LinearSystem {
+    matrix: Vec<f32>,
+    rhs: Vec<f32>,
+    size: usize,
+}
+
+fn build_panel_solution_from_strengths(
+    params: &NacaParams,
+    alpha_deg: f32,
+    freestream: Vec2,
+    panels: &[Panel],
+    sources: &[f32],
+    gamma: f32,
+) -> PanelSolution {
+    let sample_count = (params.num_points / 2).max(32);
+    let m = params.m();
+    let p = params.p();
+    let t = params.t();
 
     let mut xs = Vec::with_capacity(sample_count);
     let mut cp_u = Vec::with_capacity(sample_count);
@@ -249,13 +350,13 @@ pub fn compute_panel_solution(
 
         let induced_u = induced_velocity_from_solution(
             sample_upper,
-            &panels,
+            panels,
             sources,
             gamma,
         );
         let induced_l = induced_velocity_from_solution(
             sample_lower,
-            &panels,
+            panels,
             sources,
             gamma,
         );
@@ -283,7 +384,7 @@ pub fn compute_panel_solution(
 
     let (cl_cached, cm_c4_cached, _) =
         analytic_section_coeffs(params, alpha_deg);
-    let panel_solution = PanelSolution {
+    PanelSolution {
         x: xs,
         cp_upper: cp_u,
         cp_lower: cp_l,
@@ -291,24 +392,7 @@ pub fn compute_panel_solution(
         lower_coords,
         cl_cached: Some(cl_cached),
         cm_c4_cached: Some(cm_c4_cached),
-    };
-
-    panel_solution
-}
-
-/// Quick analytic fallback (old toy model) used for visualization when the
-/// full panel solution is too noisy for Cp plotting.
-pub fn compute_cp_approx(
-    params: &NacaParams,
-    alpha_deg: f32,
-) -> PanelSolution {
-    compute_fallback_solution(params, alpha_deg)
-}
-
-struct LinearSystem {
-    matrix: Vec<f32>,
-    rhs: Vec<f32>,
-    size: usize,
+    }
 }
 
 fn kutta_te_panel_indices(panels: &[Panel]) -> (usize, usize) {
@@ -404,6 +488,64 @@ fn assemble_system(panels: &[Panel], freestream: Vec2) -> LinearSystem {
     LinearSystem { matrix, rhs, size }
 }
 
+fn assemble_matrix(panels: &[Panel]) -> (Vec<f32>, usize, Vec2, Vec2) {
+    let n = panels.len();
+    let size = n + 1;
+    let mut matrix = vec![0.0; size * size];
+
+    for (i, panel_i) in panels.iter().enumerate() {
+        let colloc = panel_i.mid + panel_i.normal * COLLOCATION_OFFSET;
+
+        for (j, panel_j) in panels.iter().enumerate() {
+            let src = line_source_velocity(colloc, panel_j);
+            let vort = line_vortex_velocity(colloc, panel_j);
+            matrix[i * size + j] = src.dot(panel_i.normal);
+            matrix[i * size + n] += vort.dot(panel_i.normal);
+        }
+    }
+
+    let (upper_idx, lower_idx) = kutta_te_panel_indices(panels);
+    let upper = &panels[upper_idx];
+    let lower = &panels[lower_idx];
+    let upper_colloc = upper.mid + upper.normal * COLLOCATION_OFFSET;
+    let lower_colloc = lower.mid + lower.normal * COLLOCATION_OFFSET;
+    let upper_dir = upper.tangent;
+    let lower_dir = -lower.tangent;
+
+    for (j, panel_j) in panels.iter().enumerate() {
+        let src_upper = line_source_velocity(upper_colloc, panel_j);
+        let src_lower = line_source_velocity(lower_colloc, panel_j);
+        let vort_upper = line_vortex_velocity(upper_colloc, panel_j);
+        let vort_lower = line_vortex_velocity(lower_colloc, panel_j);
+
+        matrix[n * size + j] =
+            src_upper.dot(upper_dir) - src_lower.dot(lower_dir);
+        matrix[n * size + n] +=
+            vort_upper.dot(upper_dir) - vort_lower.dot(lower_dir);
+    }
+
+    (matrix, size, upper_dir, lower_dir)
+}
+
+fn assemble_rhs(
+    panels: &[Panel],
+    freestream: Vec2,
+    upper_dir: Vec2,
+    lower_dir: Vec2,
+) -> Vec<f32> {
+    let n = panels.len();
+    let size = n + 1;
+    let mut rhs = vec![0.0; size];
+
+    for (i, panel_i) in panels.iter().enumerate() {
+        rhs[i] = -freestream.dot(panel_i.normal);
+    }
+
+    // Kutta: match tangential velocity on the two TE-adjacent panels.
+    rhs[n] = -freestream.dot(upper_dir) + freestream.dot(lower_dir);
+    rhs
+}
+
 fn solve_linear_system(system: LinearSystem) -> Vec<f32> {
     let n = system.size;
     let mut a = system.matrix;
@@ -454,6 +596,95 @@ fn solve_linear_system(system: LinearSystem) -> Vec<f32> {
     }
 
     b
+}
+
+fn lu_factorize(
+    matrix: &[f32],
+    n: usize,
+) -> Option<(Vec<f32>, Vec<usize>)> {
+    let mut lu = matrix.to_vec();
+    let mut pivots: Vec<usize> = Vec::with_capacity(n);
+
+    for k in 0..n {
+        let mut pivot_row = k;
+        let mut pivot_val = lu[k * n + k].abs();
+        for i in (k + 1)..n {
+            let val = lu[i * n + k].abs();
+            if val > pivot_val {
+                pivot_val = val;
+                pivot_row = i;
+            }
+        }
+        if pivot_val < 1e-10 {
+            return None;
+        }
+        pivots.push(pivot_row);
+        if pivot_row != k {
+            for col in 0..n {
+                lu.swap(k * n + col, pivot_row * n + col);
+            }
+        }
+
+        let pivot = lu[k * n + k];
+        if pivot.abs() < 1e-12 {
+            return None;
+        }
+
+        for i in (k + 1)..n {
+            lu[i * n + k] /= pivot;
+            let lik = lu[i * n + k];
+            if lik.abs() < 1e-12 {
+                continue;
+            }
+            for j in (k + 1)..n {
+                lu[i * n + j] -= lik * lu[k * n + j];
+            }
+        }
+    }
+
+    Some((lu, pivots))
+}
+
+fn lu_solve(
+    lu: &[f32],
+    pivots: &[usize],
+    rhs: &[f32],
+    n: usize,
+) -> Option<Vec<f32>> {
+    if rhs.len() != n || pivots.len() != n || lu.len() != n * n {
+        return None;
+    }
+
+    let mut x = rhs.to_vec();
+    for (k, &pivot_row) in pivots.iter().enumerate() {
+        if pivot_row != k {
+            x.swap(k, pivot_row);
+        }
+    }
+
+    // Forward substitution: L y = P b (L has unit diagonal).
+    for i in 0..n {
+        let mut sum = x[i];
+        for j in 0..i {
+            sum -= lu[i * n + j] * x[j];
+        }
+        x[i] = sum;
+    }
+
+    // Back substitution: U x = y.
+    for i in (0..n).rev() {
+        let mut sum = x[i];
+        for j in (i + 1)..n {
+            sum -= lu[i * n + j] * x[j];
+        }
+        let diag = lu[i * n + i];
+        if diag.abs() < 1e-12 {
+            return None;
+        }
+        x[i] = sum / diag;
+    }
+
+    Some(x)
 }
 
 fn line_source_velocity(point: Vec2, panel: &Panel) -> Vec2 {

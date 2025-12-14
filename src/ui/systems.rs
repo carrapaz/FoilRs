@@ -7,6 +7,7 @@ use bevy::{
     window::{PrimaryWindow, WindowResized},
 };
 
+use crate::solvers::panel::PanelLuSystem;
 use crate::solvers::{
     BoundaryLayerInputs, compute_panel_solution,
     estimate_boundary_layer,
@@ -587,13 +588,26 @@ pub fn update_table_text(
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
     mut query: Query<(&mut Text, &TableField)>,
+    mut cache: Local<UiPanelSystemCache>,
 ) {
     if !params.is_changed() && !flow.is_changed() {
         return;
     }
 
     let cl = cl_thin(flow.alpha_deg);
-    let panel_sol = compute_panel_solution(&params, flow.alpha_deg);
+    let key = PanelKey::from(&*params);
+    if cache.key != Some(key) {
+        cache.key = Some(key);
+        cache.system = PanelLuSystem::new(&params);
+    }
+
+    let panel_sol = cache
+        .system
+        .as_ref()
+        .map(|sys| sys.panel_solution(&params, flow.alpha_deg))
+        .unwrap_or_else(|| {
+            compute_panel_solution(&params, flow.alpha_deg)
+        });
     let est_cl = panel_sol.cl().unwrap_or(f32::NAN);
     let est_cm = panel_sol.cm_c4().unwrap_or(f32::NAN);
     let beta = (1.0 - flow.mach * flow.mach).clamp(0.05, 1.0).sqrt();
@@ -648,6 +662,31 @@ pub fn update_table_text(
             TableField::FlowState => flow_state_text.clone(),
         };
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct PanelKey {
+    m: u8,
+    p: u8,
+    t: u16,
+    num_points: usize,
+}
+
+impl From<&NacaParams> for PanelKey {
+    fn from(params: &NacaParams) -> Self {
+        Self {
+            m: params.m_digit.round().clamp(0.0, 9.0) as u8,
+            p: params.p_digit.round().clamp(0.0, 9.0) as u8,
+            t: params.t_digits.round().clamp(0.0, 99.0) as u16,
+            num_points: params.num_points,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct UiPanelSystemCache {
+    key: Option<PanelKey>,
+    system: Option<PanelLuSystem>,
 }
 
 pub fn handle_view_buttons(

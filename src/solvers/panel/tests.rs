@@ -43,7 +43,10 @@ fn pg_scaling_increases_induced_velocity_with_mach() {
     let alpha_rad = alpha_deg.to_radians();
     let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
 
-    let flow = compute_panel_flow(&params, alpha_deg)
+    let system =
+        PanelLuSystem::new(&params).expect("panel system should build");
+    let flow = system
+        .solve_flow(alpha_deg)
         .expect("panel flow should solve");
     let p = Vec2::new(0.3, 0.05);
 

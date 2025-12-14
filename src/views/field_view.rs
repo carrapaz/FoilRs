@@ -1,7 +1,4 @@
-use crate::{
-    state::{FlowSettings, NacaParams},
-    views::CHORD_PX,
-};
+use crate::{state::FlowSettings, views::CHORD_PX};
 use bevy::{
     math::{Mat2, Vec2},
     prelude::*,
@@ -19,16 +16,14 @@ pub(super) struct FieldPrimitives {
 }
 
 pub(super) fn compute_field_primitives(
-    params: &NacaParams,
     flow: &FlowSettings,
     body: &[Vec2],
+    panel_system: Option<&crate::solvers::panel::PanelLuSystem>,
 ) -> FieldPrimitives {
     let mut prims = FieldPrimitives::default();
     let alpha_rad = flow.alpha_deg.to_radians();
-    let panel_flow = crate::solvers::panel::compute_panel_flow(
-        params,
-        flow.alpha_deg,
-    );
+    let panel_flow =
+        panel_system.and_then(|sys| sys.solve_flow(flow.alpha_deg));
     compute_arrow_lines(
         alpha_rad,
         flow,
@@ -67,7 +62,7 @@ fn compute_arrow_lines(
     alpha_rad: f32,
     flow_settings: &FlowSettings,
     body: &[Vec2],
-    flow: Option<&crate::solvers::panel::PanelFlow>,
+    flow: Option<&crate::solvers::panel::PanelFlow<'_>>,
     out: &mut Vec<(Vec2, Vec2, Color)>,
 ) {
     let nx = 24;
@@ -149,7 +144,7 @@ fn compute_streamlines(
     alpha_rad: f32,
     flow_settings: &FlowSettings,
     body: &[Vec2],
-    flow: Option<&crate::solvers::panel::PanelFlow>,
+    flow: Option<&crate::solvers::panel::PanelFlow<'_>>,
     out: &mut Vec<Vec<Vec2>>,
 ) {
     let seeds_y = [-0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6];
