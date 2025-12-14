@@ -89,6 +89,16 @@ FoilRs’ solver + geometry code can be used without the Bevy UI by disabling de
 cargo run --example headless --no-default-features -- 2412 4.0
 ```
 
+### Benchmark (headless)
+
+Quick timing harness (no extra deps), recommended in `--release`:
+
+```bash
+cargo run --example bench_headless --no-default-features --release -- 2412 4.0
+```
+
+Args (all optional): `NACA ALPHA_DEG PANEL_ITERS POLAR_ITERS ALPHA_MIN ALPHA_MAX ALPHA_STEP`
+
 ### Controls
 
 - **View selector**: top bar → `View` (Field / Cp(x) / Polars / Panels)

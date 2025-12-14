@@ -10,7 +10,7 @@ use crate::state::{NacaParams, VisualMode};
 use super::super::style;
 use super::super::types::{
     ExportPolarsButton, ExportStatusText, InputModeButton, NacaHeading,
-    TopBar, UiInputMode, ViewButton,
+    ThemeToggleButton, TopBar, UiColorThemeMode, UiInputMode, ViewButton,
 };
 
 const TOP_BAR_HEIGHT: f32 = 56.0;
@@ -21,6 +21,8 @@ pub(super) fn spawn_top_bar(
     params: &NacaParams,
     mode: VisualMode,
     input_mode: UiInputMode,
+    theme_mode: UiColorThemeMode,
+    export_status: &str,
 ) {
     root.spawn((
         Node {
@@ -34,7 +36,7 @@ pub(super) fn spawn_top_bar(
             ..default()
         },
         BorderColor::all(Color::srgb(0.18, 0.18, 0.22)),
-        BackgroundColor(style::top_bar_color(mode)),
+        BackgroundColor(style::top_bar_color(mode, theme_mode)),
         TopBar,
     ))
     .with_children(|bar| {
@@ -106,7 +108,7 @@ pub(super) fn spawn_top_bar(
                     BorderColor::all(Color::srgb(0.25, 0.25, 0.32)),
                     BorderRadius::all(Val::Px(999.0)),
                     BackgroundColor(style::view_button_color(
-                        mode, view,
+                        mode, view, theme_mode,
                     )),
                     Button,
                     ViewButton { mode: view },
@@ -157,6 +159,7 @@ pub(super) fn spawn_top_bar(
                     BorderRadius::all(Val::Px(999.0)),
                     BackgroundColor(style::input_mode_button_color(
                         mode_option == input_mode,
+                        theme_mode,
                     )),
                     Button,
                     InputModeButton { mode: mode_option },
@@ -194,7 +197,40 @@ pub(super) fn spawn_top_bar(
                     },
                     BorderColor::all(Color::srgb(0.25, 0.25, 0.32)),
                     BorderRadius::all(Val::Px(999.0)),
-                    BackgroundColor(Color::srgb(0.22, 0.22, 0.30)),
+                    BackgroundColor(style::top_right_button_color(
+                        theme_mode == UiColorThemeMode::XFoilMono,
+                        theme_mode,
+                    )),
+                    Button,
+                    ThemeToggleButton,
+                ))
+                .with_children(|btn| {
+                    btn.spawn((
+                        Text::new(theme_mode.label().to_string()),
+                        TextFont {
+                            font: ui_font.clone(),
+                            font_size: 13.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.86, 0.86, 0.92)),
+                    ));
+                });
+
+            right
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(
+                            Val::Px(12.0),
+                            Val::Px(8.0),
+                        ),
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BorderColor::all(Color::srgb(0.25, 0.25, 0.32)),
+                    BorderRadius::all(Val::Px(999.0)),
+                    BackgroundColor(style::top_right_button_color(
+                        false, theme_mode,
+                    )),
                     Button,
                     ExportPolarsButton,
                 ))
@@ -211,7 +247,7 @@ pub(super) fn spawn_top_bar(
                 });
 
             let _ = right.spawn((
-                Text::new(String::new()),
+                Text::new(export_status.to_string()),
                 ExportStatusText,
                 TextFont {
                     font: ui_font.clone(),

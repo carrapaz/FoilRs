@@ -23,6 +23,7 @@ pub(super) fn spawn_geometry_section(
     asset_server: &AssetServer,
     params: &NacaParams,
     sections: &PanelSections,
+    theme_mode: super::super::types::UiColorThemeMode,
 ) {
     let geometry_open = sections.is_open(PanelSection::Geometry);
     panel
@@ -34,7 +35,10 @@ pub(super) fn spawn_geometry_section(
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor(style::section_header_color(geometry_open)),
+            BackgroundColor(style::section_header_color(
+                geometry_open,
+                theme_mode,
+            )),
             BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
             Button,
             SectionToggle {
@@ -78,7 +82,7 @@ pub(super) fn spawn_geometry_section(
                 ),
                 InputSlider,
                 observe(slider_self_update),
-                observe(
+            observe(
                     |change: On<ValueChange<f32>>,
                      mut p: ResMut<NacaParams>| {
                         p.m_digit =
@@ -89,6 +93,7 @@ pub(super) fn spawn_geometry_section(
             spawn_numeric_input(
                 geo,
                 asset_server,
+                theme_mode,
                 NumericField::NacaMDigit,
                 format!("{:.0}", params.m_digit),
                 0.0,
@@ -120,6 +125,7 @@ pub(super) fn spawn_geometry_section(
             spawn_numeric_input(
                 geo,
                 asset_server,
+                theme_mode,
                 NumericField::NacaPDigit,
                 format!("{:.0}", params.p_digit),
                 0.0,
@@ -151,6 +157,7 @@ pub(super) fn spawn_geometry_section(
             spawn_numeric_input(
                 geo,
                 asset_server,
+                theme_mode,
                 NumericField::NacaTDigits,
                 format!("{:.0}", params.t_digits),
                 1.0,

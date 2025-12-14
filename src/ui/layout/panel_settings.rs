@@ -12,11 +12,24 @@ use crate::{airfoil::build_naca_body_geometry, state::NacaParams};
 
 use super::super::config;
 use super::super::types::PanelCountText;
+use super::super::types::UiColorThemeMode;
 
 pub(super) fn spawn_panel_settings(
     panel: &mut ChildSpawnerCommands<'_>,
     params: &NacaParams,
+    theme_mode: UiColorThemeMode,
 ) {
+    let (hint_color, note_bg) = match theme_mode {
+        UiColorThemeMode::Colorful => (
+            Color::srgb(0.70, 0.70, 0.76),
+            Color::srgb(0.12, 0.12, 0.16),
+        ),
+        UiColorThemeMode::XFoilMono => (
+            Color::srgb(0.85, 0.85, 0.85),
+            Color::srgb(0.04, 0.04, 0.04),
+        ),
+    };
+
     panel
         .spawn(Node {
             width: Val::Percent(100.0),
@@ -55,7 +68,7 @@ pub(super) fn spawn_panel_settings(
                 Text::new(
                     "Tip: fewer panels makes polars much faster.",
                 ),
-                TextColor(Color::srgb(0.70, 0.70, 0.76)),
+                TextColor(hint_color),
             ));
 
             root.spawn((
@@ -64,7 +77,7 @@ pub(super) fn spawn_panel_settings(
                     padding: UiRect::axes(Val::Px(8.0), Val::Px(6.0)),
                     ..default()
                 },
-                BackgroundColor(Color::srgb(0.12, 0.12, 0.16)),
+                BackgroundColor(note_bg),
                 BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
             ))
             .with_children(|note| {

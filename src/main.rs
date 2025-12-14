@@ -1,5 +1,5 @@
 use bevy::feathers::{
-    FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme,
+    FeathersPlugins, theme::UiTheme,
 };
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin, WindowResolution};
@@ -8,11 +8,14 @@ use foil_rs::{plotter, state, ui, views};
 use state::{FlowSettings, NacaParams, VisualMode};
 
 fn main() {
+    let theme_mode = ui::UiColorThemeMode::default();
+
     App::new()
         // Black background, like XFoil.
         .insert_resource(ClearColor(Color::BLACK))
         // Feathers dark theme.
-        .insert_resource(UiTheme(create_dark_theme()))
+        .insert_resource(theme_mode)
+        .insert_resource(UiTheme(ui::theme_props_for(theme_mode)))
         // State
         .insert_resource(NacaParams::default())
         .insert_resource(FlowSettings::default())
@@ -40,6 +43,14 @@ fn main() {
         .add_systems(
             Startup,
             (setup_camera, ui::set_initial_ui_scale, ui::setup_ui),
+        )
+        .add_systems(
+            Update,
+            (
+                ui::handle_theme_toggle_button,
+                ui::rebuild_ui_on_theme_change,
+            )
+                .chain(),
         )
         // Update – ONLY systems, no slider_self_update here.
         .add_systems(

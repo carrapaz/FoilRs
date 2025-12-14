@@ -14,6 +14,34 @@ impl Default for UiInputMode {
     }
 }
 
+#[derive(Resource, Clone, Copy, PartialEq, Eq)]
+pub enum UiColorThemeMode {
+    Colorful,
+    XFoilMono,
+}
+
+impl Default for UiColorThemeMode {
+    fn default() -> Self {
+        Self::Colorful
+    }
+}
+
+impl UiColorThemeMode {
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::Colorful => Self::XFoilMono,
+            Self::XFoilMono => Self::Colorful,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Colorful => "Theme: Color",
+            Self::XFoilMono => "Theme: B/W",
+        }
+    }
+}
+
 #[derive(Resource, Clone)]
 pub struct PanelSections {
     pub geometry_open: bool,
@@ -89,6 +117,9 @@ pub struct ExportPolarsButton;
 #[derive(Component)]
 pub struct ExportStatusText;
 
+#[derive(Component)]
+pub struct ThemeToggleButton;
+
 #[derive(Resource, Default, Clone)]
 pub struct ExportStatus {
     pub message: String,
@@ -147,3 +178,6 @@ pub struct ModePanel;
 
 #[derive(Component)]
 pub struct TopBar;
+
+#[derive(Component)]
+pub struct UiRoot;

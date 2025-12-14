@@ -2,7 +2,23 @@ use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 
 use crate::state::TableField;
 
-pub(super) fn spawn_summary_panel(root: &mut ChildSpawnerCommands<'_>) {
+pub(super) fn spawn_summary_panel(
+    root: &mut ChildSpawnerCommands<'_>,
+    theme_mode: crate::ui::types::UiColorThemeMode,
+) {
+    let (panel_bg, card_bg, border) = match theme_mode {
+        crate::ui::types::UiColorThemeMode::Colorful => (
+            Color::srgb(0.08, 0.08, 0.10).with_alpha(0.85),
+            Color::srgb(0.15, 0.15, 0.20),
+            Color::srgb(0.22, 0.22, 0.28),
+        ),
+        crate::ui::types::UiColorThemeMode::XFoilMono => (
+            Color::srgb(0.0, 0.0, 0.0).with_alpha(0.90),
+            Color::srgb(0.06, 0.06, 0.06),
+            Color::srgb(0.55, 0.55, 0.55),
+        ),
+    };
+
     root.spawn((
         Node {
             position_type: PositionType::Absolute,
@@ -15,9 +31,9 @@ pub(super) fn spawn_summary_panel(root: &mut ChildSpawnerCommands<'_>) {
             border: UiRect::all(Val::Px(1.0)),
             ..default()
         },
-        BorderColor::all(Color::srgb(0.22, 0.22, 0.28)),
+        BorderColor::all(border),
         BorderRadius::all(Val::Px(12.0)),
-        BackgroundColor(Color::srgb(0.08, 0.08, 0.10).with_alpha(0.85)),
+        BackgroundColor(panel_bg),
     ))
     .with_children(|panel| {
         panel.spawn(Text::new("Summary"));
@@ -30,7 +46,7 @@ pub(super) fn spawn_summary_panel(root: &mut ChildSpawnerCommands<'_>) {
                     padding: UiRect::all(Val::Px(10.0)),
                     ..default()
                 },
-                BackgroundColor(Color::srgb(0.15, 0.15, 0.20)),
+                BackgroundColor(card_bg),
                 BorderRadius::all(Val::Px(10.0)),
             ))
             .with_children(spawn_summary_table);

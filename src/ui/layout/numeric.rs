@@ -13,6 +13,7 @@ use super::super::{config, style};
 pub(super) fn spawn_numeric_input(
     parent: &mut ChildSpawnerCommands<'_>,
     asset_server: &AssetServer,
+    theme_mode: super::super::types::UiColorThemeMode,
     field: NumericField,
     initial_text: String,
     min: f32,
@@ -41,9 +42,9 @@ pub(super) fn spawn_numeric_input(
                     border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
-                BorderColor::all(style::input_border(false)),
+                BorderColor::all(style::input_border(false, theme_mode)),
                 BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
-                BackgroundColor(style::input_bg(false)),
+                BackgroundColor(style::input_bg(false, theme_mode)),
                 Button,
                 NumericInput {
                     field,

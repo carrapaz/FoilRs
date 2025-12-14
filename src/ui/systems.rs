@@ -21,9 +21,10 @@ use super::types::{
     LeftPanelPanelControls, ModePanel, NacaHeading, NumericField,
     NumericInput, NumericInputFocus, NumericInputRow, NumericInputText,
     PanelCountText, PanelSections, SectionContent, SectionToggle,
-    TopBar, UiInputMode, ViewButton,
+    ThemeToggleButton, TopBar, UiColorThemeMode, UiInputMode, UiRoot,
+    ViewButton,
 };
-use super::{config, style};
+use super::{config, feathers_theme, layout, style};
 use std::path::{Path, PathBuf};
 
 pub fn set_initial_ui_scale(
@@ -70,26 +71,90 @@ pub fn slim_sliders(
 
 pub fn update_mode_panel_tint(
     mode: Res<VisualMode>,
+    theme_mode: Res<UiColorThemeMode>,
     mut panels: Query<&mut BackgroundColor, With<ModePanel>>,
 ) {
-    if !mode.is_changed() {
+    if !mode.is_changed() && !theme_mode.is_changed() {
         return;
     }
     for mut bg in &mut panels {
-        *bg = BackgroundColor(style::panel_base_color(*mode));
+        *bg = BackgroundColor(style::panel_base_color(
+            *mode,
+            *theme_mode,
+        ));
     }
 }
 
 pub fn update_top_bar_tint(
     mode: Res<VisualMode>,
+    theme_mode: Res<UiColorThemeMode>,
     mut bars: Query<&mut BackgroundColor, With<TopBar>>,
 ) {
-    if !mode.is_changed() {
+    if !mode.is_changed() && !theme_mode.is_changed() {
         return;
     }
     for mut bg in &mut bars {
-        *bg = BackgroundColor(style::top_bar_color(*mode));
+        *bg = BackgroundColor(style::top_bar_color(
+            *mode,
+            *theme_mode,
+        ));
     }
+}
+
+pub fn handle_theme_toggle_button(
+    mut theme_mode: ResMut<UiColorThemeMode>,
+    mut theme: ResMut<bevy::feathers::theme::UiTheme>,
+    mut q: Query<
+        &Interaction,
+        (With<ThemeToggleButton>, Changed<Interaction>),
+    >,
+) {
+    for interaction in &mut q {
+        if !matches!(*interaction, Interaction::Pressed) {
+            continue;
+        }
+        *theme_mode = theme_mode.toggle();
+        *theme = bevy::feathers::theme::UiTheme(
+            feathers_theme::theme_props_for(*theme_mode),
+        );
+    }
+}
+
+pub fn rebuild_ui_on_theme_change(
+    mut commands: Commands,
+    theme_mode: Res<UiColorThemeMode>,
+    asset_server: Res<AssetServer>,
+    params: Res<NacaParams>,
+    flow: Res<FlowSettings>,
+    mode: Res<VisualMode>,
+    sections: Res<PanelSections>,
+    input_mode: Res<UiInputMode>,
+    export_status: Res<ExportStatus>,
+    mut focus: ResMut<NumericInputFocus>,
+    roots: Query<Entity, With<UiRoot>>,
+) {
+    if !theme_mode.is_changed() {
+        return;
+    }
+
+    focus.active = None;
+    focus.buffer.clear();
+
+    for e in &roots {
+        commands.entity(e).despawn();
+    }
+
+    let _ = layout::spawn_ui_root(
+        &mut commands,
+        &asset_server,
+        &params,
+        &flow,
+        *mode,
+        &sections,
+        *input_mode,
+        *theme_mode,
+        &export_status,
+    );
 }
 
 pub fn handle_export_polars_button(
@@ -371,6 +436,7 @@ pub fn handle_numeric_input_edit(
 
 pub fn sync_numeric_inputs(
     focus: Res<NumericInputFocus>,
+    theme_mode: Res<UiColorThemeMode>,
     mut inputs: Query<(
         Entity,
         &NumericInput,
@@ -387,8 +453,10 @@ pub fn sync_numeric_inputs(
     }
     for (entity, _input, mut bg, mut border) in &mut inputs {
         let focused = focus.active == Some(entity);
-        *bg = BackgroundColor(style::input_bg(focused));
-        *border = BorderColor::all(style::input_border(focused));
+        *bg = BackgroundColor(style::input_bg(focused, *theme_mode));
+        *border = BorderColor::all(style::input_border(
+            focused, *theme_mode,
+        ));
     }
 
     for (owner, mut text) in &mut texts {
@@ -472,14 +540,16 @@ pub fn handle_input_mode_buttons(
 
 pub fn update_input_mode_button_styles(
     input_mode: Res<UiInputMode>,
+    theme_mode: Res<UiColorThemeMode>,
     mut q: Query<(&InputModeButton, &mut BackgroundColor)>,
 ) {
-    if !input_mode.is_changed() {
+    if !input_mode.is_changed() && !theme_mode.is_changed() {
         return;
     }
     for (button, mut bg) in &mut q {
         *bg = BackgroundColor(style::input_mode_button_color(
             button.mode == *input_mode,
+            *theme_mode,
         ));
     }
 }
@@ -586,6 +656,7 @@ pub fn update_table_text(
 
 pub fn handle_view_buttons(
     mut mode: ResMut<VisualMode>,
+    theme_mode: Res<UiColorThemeMode>,
     mut q: Query<
         (&Interaction, &mut BackgroundColor, &ViewButton),
         With<ViewButton>,
@@ -599,12 +670,14 @@ pub fn handle_view_buttons(
         *bg = BackgroundColor(style::view_button_color(
             *mode,
             button.mode,
+            *theme_mode,
         ));
     }
 }
 
 pub fn handle_section_toggle_buttons(
     mut sections: ResMut<PanelSections>,
+    theme_mode: Res<UiColorThemeMode>,
     mut q: Query<
         (
             &Interaction,
@@ -624,7 +697,10 @@ pub fn handle_section_toggle_buttons(
             open = sections.toggle(toggle.section);
             any_changed = true;
         }
-        *bg = BackgroundColor(style::section_header_color(open));
+        *bg = BackgroundColor(style::section_header_color(
+            open,
+            *theme_mode,
+        ));
 
         if let Some(&child) = children.first() {
             if let Ok(mut text) = texts.get_mut(child) {
@@ -645,6 +721,7 @@ pub fn handle_section_toggle_buttons(
 
 pub fn handle_flow_toggle_buttons(
     mut flow: ResMut<FlowSettings>,
+    theme_mode: Res<UiColorThemeMode>,
     mut q: Query<
         (
             &Interaction,
@@ -672,7 +749,10 @@ pub fn handle_flow_toggle_buttons(
             FlowToggleKind::Viscosity => flow.viscous,
             FlowToggleKind::Transition => flow.free_transition,
         };
-        *bg = BackgroundColor(style::toggle_color(active));
+        *bg = BackgroundColor(style::toggle_color(
+            active,
+            *theme_mode,
+        ));
 
         if let Some(&child) = children.first() {
             if let Ok(mut text) = texts.get_mut(child) {

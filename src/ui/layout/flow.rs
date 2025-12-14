@@ -23,6 +23,7 @@ pub(super) fn spawn_flow_section(
     asset_server: &AssetServer,
     flow: &FlowSettings,
     sections: &PanelSections,
+    theme_mode: super::super::types::UiColorThemeMode,
 ) {
     let flow_open = sections.is_open(PanelSection::Flow);
     panel
@@ -34,7 +35,10 @@ pub(super) fn spawn_flow_section(
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor(style::section_header_color(flow_open)),
+            BackgroundColor(style::section_header_color(
+                flow_open,
+                theme_mode,
+            )),
             BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
             Button,
             SectionToggle {
@@ -88,6 +92,7 @@ pub(super) fn spawn_flow_section(
             spawn_numeric_input(
                 flow_panel,
                 asset_server,
+                theme_mode,
                 NumericField::AlphaDeg,
                 format!("{:.2}", flow.alpha_deg),
                 -10.0,
@@ -119,6 +124,7 @@ pub(super) fn spawn_flow_section(
             spawn_numeric_input(
                 flow_panel,
                 asset_server,
+                theme_mode,
                 NumericField::ReynoldsMillions,
                 format!("{:.2}", flow.reynolds / 1_000_000.0),
                 0.1,
@@ -149,6 +155,7 @@ pub(super) fn spawn_flow_section(
             spawn_numeric_input(
                 flow_panel,
                 asset_server,
+                theme_mode,
                 NumericField::Mach,
                 format!("{:.2}", flow.mach),
                 0.0,
@@ -170,7 +177,10 @@ pub(super) fn spawn_flow_section(
                         align_items: AlignItems::Center,
                         ..default()
                     },
-                    BackgroundColor(style::toggle_color(flow.viscous)),
+                    BackgroundColor(style::toggle_color(
+                        flow.viscous,
+                        theme_mode,
+                    )),
                     BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
                     Button,
                     FlowToggleKind::Viscosity,
@@ -200,6 +210,7 @@ pub(super) fn spawn_flow_section(
                     },
                     BackgroundColor(style::toggle_color(
                         flow.free_transition,
+                        theme_mode,
                     )),
                     BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
                     Button,
