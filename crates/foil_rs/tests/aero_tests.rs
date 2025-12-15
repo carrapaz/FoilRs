@@ -1,8 +1,8 @@
 use foil_rs::solvers::{
     BoundaryLayerInputs, compute_panel_solution,
-    estimate_boundary_layer,
+    compute_polar_sweep, estimate_boundary_layer,
 };
-use foil_rs::state::{NacaParams, reference_coeffs};
+use foil_rs::state::{FlowSettings, NacaParams, reference_coeffs};
 
 #[test]
 fn reference_values_match_xfoil() {
@@ -149,4 +149,60 @@ fn cp_lower_is_more_negative_near_le_at_negative_alpha() {
         cp_u,
         cp_l
     );
+}
+
+#[test]
+fn naca0012_alpha0_has_near_zero_lift() {
+    let params =
+        NacaParams::from_naca4("0012").expect("parse NACA 0012");
+    let sol = compute_panel_solution(&params, 0.0);
+    let cl = sol.cl().unwrap_or(f32::NAN);
+    assert!(
+        cl.is_finite() && cl.abs() < 0.05,
+        "expected near-zero lift for symmetric foil at 0 deg, got cl={}",
+        cl
+    );
+}
+
+#[test]
+fn naca0012_lift_is_approximately_antisymmetric_inviscid() {
+    let params =
+        NacaParams::from_naca4("0012").expect("parse NACA 0012");
+    let cl_pos = compute_panel_solution(&params, 4.0)
+        .cl()
+        .unwrap_or(f32::NAN);
+    let cl_neg = compute_panel_solution(&params, -4.0)
+        .cl()
+        .unwrap_or(f32::NAN);
+    assert!(
+        cl_pos.is_finite() && cl_neg.is_finite(),
+        "expected finite CL values, got cl(+4)={} cl(-4)={}",
+        cl_pos,
+        cl_neg
+    );
+    assert!(
+        (cl_pos + cl_neg).abs() < 0.10,
+        "expected approximate antisymmetry: cl(+4)+cl(-4) ~= 0, got {}",
+        cl_pos + cl_neg
+    );
+}
+
+#[test]
+fn polar_sweep_has_expected_count_and_sorted_alphas() {
+    let params = NacaParams::default();
+    let flow = FlowSettings::default();
+    let rows = compute_polar_sweep(&params, &flow, -10.0, 15.0, 0.5);
+
+    assert_eq!(rows.len(), 51, "unexpected polar row count");
+    assert!((rows[0].alpha_deg + 10.0).abs() < 1e-5);
+    assert!((rows[rows.len() - 1].alpha_deg - 15.0).abs() < 1e-5);
+
+    for w in rows.windows(2) {
+        assert!(
+            w[0].alpha_deg < w[1].alpha_deg,
+            "expected strictly increasing alpha, got {} then {}",
+            w[0].alpha_deg,
+            w[1].alpha_deg
+        );
+    }
 }

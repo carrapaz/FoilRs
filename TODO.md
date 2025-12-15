@@ -1,8 +1,5 @@
 ## TODO
 
-### Next up (code health + scalability)
-- [ ] Consider splitting published crates further (e.g. `foil_rs_core` vs `foil_rs_bevy`) if/when the public API surface grows.
-
 ### Completed
 - [x] Split into a Cargo workspace: `foil_rs` (core) + `foil_rs_bevy` (UI/app).
 - [x] Improve headless benchmarking harness (warmup, multi-run stats).
@@ -37,7 +34,7 @@
 - [x] Show panel discretization controls only in Panels view (hide geometry/flow controls there).
 
 ### Essential for a truly useful release
-- [ ] Expand test coverage and reference data (flat plate, symmetric foils, NACA 2412 across α) to keep the solver calibrated.
+- [x] Expand test coverage and reference data (symmetric foils + polar sweep invariants) to keep the solver calibrated.
 - [ ] Support multi-polars across Re/M (multiple curves + CSV) for XFOIL comparison.
 - [ ] Allow importing/saving arbitrary airfoil shapes (e.g., .dat) with cosine spacing and normalization utilities.
 - [ ] UI polish for production use: richer charts (Cp annotations, polar plots), presets/reset, tooltips, run/stop controls.
