@@ -7,7 +7,7 @@ use bevy::{
 use crate::airfoil::build_naca_body_geometry;
 use crate::plotter::{CpPlotLabels, PolarPlotLabels};
 use crate::state::{FlowSettings, NacaParams};
-use crate::ui::VisualMode;
+use crate::ui::{PolarSweepSettings, VisualMode};
 
 mod cp_view;
 mod field_view;
@@ -71,7 +71,8 @@ pub struct VizCache {
     cp_labels_key: Option<(u32, u32)>,
     cp_labels_dirty: bool,
 
-    polar_key: Option<(NacaKey, u32, u32, bool, bool)>,
+    polar_key:
+        Option<(NacaKey, u32, u32, bool, bool, u32, u32, u32, u8)>,
     polar_prims: Option<PolarGraphPrimitives>,
     polar_labels_dirty: bool,
 }
@@ -84,6 +85,7 @@ pub fn draw_airfoil_and_visualization(
     mut polar_labels: ResMut<PolarPlotLabels>,
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
+    sweep: Res<PolarSweepSettings>,
     mode: Res<VisualMode>,
     mut gizmos: Gizmos,
     mut cache: Local<VizCache>,
@@ -267,18 +269,30 @@ pub fn draw_airfoil_and_visualization(
                 &mut commands,
                 &mut cp_labels,
             );
+            let threads = match sweep.threads {
+                0 => None,
+                n => Some(n as usize),
+            };
             let key = (
                 naca_key,
                 flow.mach.to_bits(),
                 flow.reynolds.to_bits(),
                 flow.viscous,
                 flow.free_transition,
+                sweep.alpha_min_deg.to_bits(),
+                sweep.alpha_max_deg.to_bits(),
+                sweep.alpha_step_deg.to_bits(),
+                sweep.threads,
             );
             if cache.polar_key != Some(key) {
                 cache.polar_key = Some(key);
                 cache.polar_prims = Some(compute_polar_primitives(
                     &params,
                     &flow,
+                    sweep.alpha_min_deg,
+                    sweep.alpha_max_deg,
+                    sweep.alpha_step_deg,
+                    threads,
                     cache.panel_system.as_ref(),
                 ));
                 cache.polar_labels_dirty = true;
@@ -298,6 +312,8 @@ pub fn draw_airfoil_and_visualization(
                 &asset_server,
                 &mut polar_labels,
                 refresh_labels,
+                sweep.alpha_min_deg,
+                sweep.alpha_max_deg,
             );
         }
         VisualMode::Panels => {

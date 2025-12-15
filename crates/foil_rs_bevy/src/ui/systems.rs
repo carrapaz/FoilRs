@@ -23,9 +23,9 @@ use super::types::{
     InputModeButton, InputSlider, LeftPanelMainControls,
     LeftPanelPanelControls, NacaHeading, NumericField, NumericInput,
     NumericInputFocus, NumericInputRow, NumericInputText,
-    PanelCountText, PanelSections, SectionContent, SectionToggle,
-    TableField, ThemeToggleButton, UiColorThemeMode, UiInputMode,
-    ViewButton, VisualMode,
+    PanelCountText, PanelSections, PolarSweepSettings, PolarsControls,
+    SectionContent, SectionToggle, TableField, ThemeToggleButton,
+    UiColorThemeMode, UiInputMode, ViewButton, VisualMode,
 };
 use super::{config, feathers_theme, style};
 use std::path::{Path, PathBuf};
@@ -147,15 +147,24 @@ pub fn handle_export_polars_button(
     >,
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
+    sweep: Res<PolarSweepSettings>,
 ) {
     for interaction in &mut q {
         if !matches!(*interaction, Interaction::Pressed) {
             continue;
         }
 
-        let (a0, a1, da) = crate::solvers::default_polar_sweep();
-        let rows = crate::solvers::compute_polar_sweep(
-            &params, &flow, a0, a1, da,
+        let threads = match sweep.threads {
+            0 => None,
+            n => Some(n as usize),
+        };
+        let rows = crate::solvers::polar::compute_polar_sweep_parallel_with_threads(
+            &params,
+            &flow,
+            sweep.alpha_min_deg,
+            sweep.alpha_max_deg,
+            sweep.alpha_step_deg,
+            threads,
         );
 
         if let Err(err) = std::fs::create_dir_all("exports") {
@@ -277,6 +286,14 @@ pub fn update_left_panel_visibility(
         &mut Node,
         (With<LeftPanelPanelControls>, Without<LeftPanelMainControls>),
     >,
+    mut polars: Query<
+        &mut Node,
+        (
+            With<PolarsControls>,
+            Without<LeftPanelMainControls>,
+            Without<LeftPanelPanelControls>,
+        ),
+    >,
 ) {
     if !mode.is_changed() {
         return;
@@ -291,6 +308,15 @@ pub fn update_left_panel_visibility(
     }
     for mut node in &mut panels {
         node.display = if show_panels {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+
+    let show_polars = *mode == VisualMode::Polars;
+    for mut node in &mut polars {
+        node.display = if show_polars {
             Display::Flex
         } else {
             Display::None
@@ -326,6 +352,7 @@ pub fn handle_numeric_input_focus(
     >,
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
+    sweep: Res<PolarSweepSettings>,
     input_mode: Res<UiInputMode>,
 ) {
     if *input_mode != UiInputMode::TypeOnly {
@@ -338,6 +365,7 @@ pub fn handle_numeric_input_focus(
                 input.field,
                 &params,
                 &flow,
+                &sweep,
                 input,
             );
         }
@@ -350,6 +378,7 @@ pub fn handle_numeric_input_edit(
     inputs: Query<&NumericInput>,
     mut params: ResMut<NacaParams>,
     mut flow: ResMut<FlowSettings>,
+    mut sweep: ResMut<PolarSweepSettings>,
     input_mode: Res<UiInputMode>,
 ) {
     if *input_mode != UiInputMode::TypeOnly {
@@ -408,6 +437,7 @@ pub fn handle_numeric_input_edit(
                 v,
                 &mut params,
                 &mut flow,
+                &mut sweep,
                 meta,
             );
         }
@@ -428,6 +458,7 @@ pub fn sync_numeric_inputs(
     mut texts: Query<(&NumericInputText, &mut Text)>,
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
+    sweep: Res<PolarSweepSettings>,
     input_mode: Res<UiInputMode>,
 ) {
     if *input_mode != UiInputMode::TypeOnly {
@@ -469,7 +500,13 @@ pub fn sync_numeric_inputs(
         text.0 = if focused {
             focus.buffer.clone()
         } else {
-            format_numeric_value(input.field, &params, &flow, input)
+            format_numeric_value(
+                input.field,
+                &params,
+                &flow,
+                &sweep,
+                input,
+            )
         };
     }
 }
@@ -478,6 +515,7 @@ fn format_numeric_value(
     field: NumericField,
     params: &NacaParams,
     flow: &FlowSettings,
+    sweep: &PolarSweepSettings,
     meta: &NumericInput,
 ) -> String {
     let v = match field {
@@ -487,6 +525,10 @@ fn format_numeric_value(
         NumericField::AlphaDeg => flow.alpha_deg,
         NumericField::ReynoldsMillions => flow.reynolds / 1_000_000.0,
         NumericField::Mach => flow.mach,
+        NumericField::PolarAlphaMinDeg => sweep.alpha_min_deg,
+        NumericField::PolarAlphaMaxDeg => sweep.alpha_max_deg,
+        NumericField::PolarAlphaStepDeg => sweep.alpha_step_deg,
+        NumericField::PolarThreads => sweep.threads as f32,
     };
 
     if meta.integer {
@@ -507,6 +549,7 @@ fn set_numeric_value(
     raw: f32,
     params: &mut NacaParams,
     flow: &mut FlowSettings,
+    sweep: &mut PolarSweepSettings,
     meta: &NumericInput,
 ) {
     let mut v = raw.clamp(meta.min, meta.max);
@@ -523,7 +566,37 @@ fn set_numeric_value(
             flow.reynolds = v * 1_000_000.0
         }
         NumericField::Mach => flow.mach = v,
+        NumericField::PolarAlphaMinDeg => sweep.alpha_min_deg = v,
+        NumericField::PolarAlphaMaxDeg => sweep.alpha_max_deg = v,
+        NumericField::PolarAlphaStepDeg => sweep.alpha_step_deg = v,
+        NumericField::PolarThreads => {
+            sweep.threads = v.round().clamp(0.0, 255.0) as u8;
+        }
     }
+}
+
+pub fn normalize_polar_sweep_settings(
+    mut sweep: ResMut<PolarSweepSettings>,
+) {
+    if !sweep.is_changed() {
+        return;
+    }
+
+    sweep.alpha_min_deg = sweep.alpha_min_deg.clamp(-30.0, 30.0);
+    sweep.alpha_max_deg = sweep.alpha_max_deg.clamp(-30.0, 30.0);
+    sweep.alpha_step_deg = sweep.alpha_step_deg.clamp(0.1, 5.0);
+
+    if sweep.alpha_min_deg > sweep.alpha_max_deg {
+        let tmp = sweep.alpha_min_deg;
+        sweep.alpha_min_deg = sweep.alpha_max_deg;
+        sweep.alpha_max_deg = tmp;
+    }
+
+    let available = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+        .min(32) as u8;
+    sweep.threads = sweep.threads.min(available);
 }
 
 pub fn handle_input_mode_buttons(

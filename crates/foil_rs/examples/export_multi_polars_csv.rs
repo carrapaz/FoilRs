@@ -7,36 +7,30 @@ use foil_rs::state::{FlowSettings, NacaParams};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if matches!(args.get(0).map(|s| s.as_str()), Some("-h" | "--help")) {
+    if matches!(args.get(0).map(|s| s.as_str()), Some("-h" | "--help"))
+    {
         print_help_and_exit();
     }
 
     let mut it = args.into_iter();
     let naca = it.next().unwrap_or_else(|| "2412".to_string());
 
-    let reynolds_millions = it.next().unwrap_or_else(|| "1.0".to_string());
+    let reynolds_millions =
+        it.next().unwrap_or_else(|| "1.0".to_string());
     let mach_list = it.next().unwrap_or_else(|| "0.10".to_string());
 
     let viscous = parse_bool(it.next().as_deref(), true);
     let free_transition = parse_bool(it.next().as_deref(), true);
 
-    let alpha_min_deg: f32 = it
-        .next()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(-10.0);
-    let alpha_max_deg: f32 = it
-        .next()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(15.0);
-    let alpha_step_deg: f32 = it
-        .next()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0.5);
+    let alpha_min_deg: f32 =
+        it.next().and_then(|s| s.parse().ok()).unwrap_or(-10.0);
+    let alpha_max_deg: f32 =
+        it.next().and_then(|s| s.parse().ok()).unwrap_or(15.0);
+    let alpha_step_deg: f32 =
+        it.next().and_then(|s| s.parse().ok()).unwrap_or(0.5);
 
-    let threads: usize = it
-        .next()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(1);
+    let threads: usize =
+        it.next().and_then(|s| s.parse().ok()).unwrap_or(1);
 
     let out_path = it
         .next()
@@ -57,8 +51,8 @@ fn main() {
         std::process::exit(2);
     }
 
-    let params =
-        NacaParams::from_naca4(&naca).unwrap_or_else(NacaParams::default);
+    let params = NacaParams::from_naca4(&naca)
+        .unwrap_or_else(NacaParams::default);
 
     let mut flows = Vec::new();
     for &re in &reynolds_values {

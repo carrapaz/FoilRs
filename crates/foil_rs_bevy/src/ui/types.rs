@@ -83,6 +83,7 @@ impl UiColorThemeMode {
 pub struct PanelSections {
     pub geometry_open: bool,
     pub flow_open: bool,
+    pub polars_open: bool,
 }
 
 impl Default for PanelSections {
@@ -90,6 +91,7 @@ impl Default for PanelSections {
         Self {
             geometry_open: true,
             flow_open: true,
+            polars_open: true,
         }
     }
 }
@@ -99,6 +101,7 @@ impl PanelSections {
         match section {
             PanelSection::Geometry => self.geometry_open,
             PanelSection::Flow => self.flow_open,
+            PanelSection::Polars => self.polars_open,
         }
     }
 
@@ -112,6 +115,10 @@ impl PanelSections {
                 self.flow_open = !self.flow_open;
                 self.flow_open
             }
+            PanelSection::Polars => {
+                self.polars_open = !self.polars_open;
+                self.polars_open
+            }
         }
     }
 }
@@ -120,6 +127,7 @@ impl PanelSections {
 pub enum PanelSection {
     Geometry,
     Flow,
+    Polars,
 }
 
 #[derive(Component)]
@@ -169,6 +177,9 @@ pub struct LeftPanelMainControls;
 pub struct LeftPanelPanelControls;
 
 #[derive(Component)]
+pub struct PolarsControls;
+
+#[derive(Component)]
 pub struct PanelCountText;
 
 #[derive(Component)]
@@ -185,6 +196,10 @@ pub enum NumericField {
     AlphaDeg,
     ReynoldsMillions,
     Mach,
+    PolarAlphaMinDeg,
+    PolarAlphaMaxDeg,
+    PolarAlphaStepDeg,
+    PolarThreads,
 }
 
 #[derive(Component)]
@@ -218,3 +233,23 @@ pub struct TopBar;
 
 #[derive(Component)]
 pub struct UiRoot;
+
+#[derive(Resource, Clone)]
+pub struct PolarSweepSettings {
+    pub alpha_min_deg: f32,
+    pub alpha_max_deg: f32,
+    pub alpha_step_deg: f32,
+    /// `0` means "auto" (use `available_parallelism()`).
+    pub threads: u8,
+}
+
+impl Default for PolarSweepSettings {
+    fn default() -> Self {
+        Self {
+            alpha_min_deg: -10.0,
+            alpha_max_deg: 15.0,
+            alpha_step_deg: 0.5,
+            threads: 0,
+        }
+    }
+}

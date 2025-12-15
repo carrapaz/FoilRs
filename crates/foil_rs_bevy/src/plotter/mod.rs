@@ -102,6 +102,8 @@ pub fn refresh_polar_labels(
     commands: &mut Commands,
     asset_server: &AssetServer,
     labels: &mut PolarPlotLabels,
+    alpha_min_deg: f32,
+    alpha_max_deg: f32,
     alpha_ticks: &[f32],
     cl_ticks: &[f32],
     cd_ticks: &[f32],
@@ -113,8 +115,6 @@ pub fn refresh_polar_labels(
     clear_polar_labels(commands, labels);
 
     const CHORD_PX: f32 = 450.0;
-    const ALPHA_MIN_DEG: f32 = -10.0;
-    const ALPHA_MAX_DEG: f32 = 15.0;
 
     let font = asset_server.load(fonts::MONO);
     let color = Color::srgb(0.7, 0.7, 0.7);
@@ -124,9 +124,8 @@ pub fn refresh_polar_labels(
     let x_right = 0.5 * CHORD_PX;
 
     let alpha_to_world_x = |alpha_deg: f32| -> f32 {
-        let t = ((alpha_deg - ALPHA_MIN_DEG)
-            / (ALPHA_MAX_DEG - ALPHA_MIN_DEG))
-            .clamp(0.0, 1.0);
+        let denom = (alpha_max_deg - alpha_min_deg).abs().max(1e-6);
+        let t = ((alpha_deg - alpha_min_deg) / denom).clamp(0.0, 1.0);
         x_left + t * (x_right - x_left)
     };
 

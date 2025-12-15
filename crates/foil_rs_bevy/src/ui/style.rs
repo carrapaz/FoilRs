@@ -10,6 +10,7 @@ pub(super) fn section_header_label(
     let title = match section {
         PanelSection::Geometry => "NACA geometry",
         PanelSection::Flow => "Freestream & viscosity",
+        PanelSection::Polars => "Polar sweep",
     };
     format!("{state} {title}")
 }

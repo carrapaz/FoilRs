@@ -18,6 +18,7 @@ fn main() {
         // State
         .insert_resource(NacaParams::default())
         .insert_resource(FlowSettings::default())
+        .insert_resource(ui::PolarSweepSettings::default())
         .insert_resource(VisualMode::Field)
         .init_resource::<ui::UiInputMode>()
         .insert_resource(ui::PanelSections::default())
@@ -56,6 +57,7 @@ fn main() {
             Update,
             (
                 ui::update_ui_scale_on_resize,
+                ui::normalize_polar_sweep_settings,
                 views::draw_airfoil_and_visualization,
                 ui::update_table_text,
                 ui::update_naca_heading,

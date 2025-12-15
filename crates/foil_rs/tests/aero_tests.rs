@@ -1,6 +1,6 @@
 use foil_rs::solvers::{
-    BoundaryLayerInputs, compute_panel_solution,
-    compute_polar_sweep, estimate_boundary_layer,
+    BoundaryLayerInputs, compute_panel_solution, compute_polar_sweep,
+    estimate_boundary_layer,
 };
 use foil_rs::state::{FlowSettings, NacaParams, reference_coeffs};
 

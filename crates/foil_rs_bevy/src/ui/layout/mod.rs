@@ -2,6 +2,7 @@ mod flow;
 mod geometry;
 mod numeric;
 mod panel_settings;
+mod polars;
 mod summary;
 mod topbar;
 
@@ -14,8 +15,8 @@ use crate::state::{FlowSettings, NacaParams};
 
 use super::types::{
     ExportStatus, LeftPanelMainControls, LeftPanelPanelControls,
-    ModePanel, PanelSections, UiColorThemeMode, UiInputMode, UiRoot,
-    VisualMode,
+    ModePanel, PanelSections, PolarSweepSettings, PolarsControls,
+    UiColorThemeMode, UiInputMode, UiRoot, VisualMode,
 };
 
 pub fn setup_ui(
@@ -23,6 +24,7 @@ pub fn setup_ui(
     asset_server: Res<AssetServer>,
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
+    sweep: Res<PolarSweepSettings>,
     mode: Res<VisualMode>,
     sections: Res<PanelSections>,
     input_mode: Res<UiInputMode>,
@@ -34,6 +36,7 @@ pub fn setup_ui(
         &asset_server,
         &params,
         &flow,
+        &sweep,
         *mode,
         &sections,
         *input_mode,
@@ -47,6 +50,7 @@ pub(super) fn spawn_ui_root(
     asset_server: &AssetServer,
     params: &NacaParams,
     flow: &FlowSettings,
+    sweep: &PolarSweepSettings,
     mode: VisualMode,
     sections: &PanelSections,
     input_mode: UiInputMode,
@@ -110,6 +114,8 @@ pub(super) fn spawn_ui_root(
                         asset_server,
                         params,
                         flow,
+                        sweep,
+                        mode,
                         sections,
                         theme_mode,
                     );
@@ -127,6 +133,8 @@ fn spawn_left_panel(
     asset_server: &AssetServer,
     params: &NacaParams,
     flow: &FlowSettings,
+    sweep: &PolarSweepSettings,
+    mode: VisualMode,
     sections: &PanelSections,
     theme_mode: UiColorThemeMode,
 ) {
@@ -156,6 +164,31 @@ fn spawn_left_panel(
                 sections,
                 theme_mode,
             );
+
+            main.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(10.0),
+                    display: if mode == VisualMode::Polars {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    },
+                    ..default()
+                },
+                PolarsControls,
+                Name::new("PolarsControls"),
+            ))
+            .with_children(|polars_controls| {
+                polars::spawn_polars_section(
+                    polars_controls,
+                    asset_server,
+                    sweep,
+                    sections,
+                    theme_mode,
+                );
+            });
         });
 
     panel
