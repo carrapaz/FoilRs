@@ -19,14 +19,15 @@ use crate::solvers::{
 use crate::state::{FlowSettings, NacaParams, cl_thin};
 
 use super::types::{
-    ExportPolarsButton, ExportStatus, ExportStatusText,
-    FlowAlphaControls, FlowToggleKind, InputModeButton, InputSlider,
+    CoeffModeButton, ExportPolarsButton, ExportStatus,
+    ExportStatusText, FallbackWarningBadge, FlowAlphaControls,
+    FlowToggleKind, InputModeButton, InputSlider,
     LeftPanelMainControls, LeftPanelPanelControls, NacaHeading,
     NumericField, NumericInput, NumericInputFocus, NumericInputRow,
     NumericInputText, PanelCountText, PanelSections,
     PolarSweepSettings, PolarsControls, SectionContent, SectionToggle,
-    TableField, ThemeToggleButton, UiColorThemeMode, UiInputMode,
-    ViewButton, VisualMode,
+    SolverDiagnostics, TableField, ThemeToggleButton, UiCoeffMode,
+    UiColorThemeMode, UiInputMode, ViewButton, VisualMode,
 };
 use super::{config, feathers_theme, style};
 use std::path::{Path, PathBuf};
@@ -149,6 +150,7 @@ pub fn handle_export_polars_button(
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
     sweep: Res<PolarSweepSettings>,
+    coeff_mode: Res<UiCoeffMode>,
 ) {
     for interaction in &mut q {
         if !matches!(*interaction, Interaction::Pressed) {
@@ -159,14 +161,26 @@ pub fn handle_export_polars_button(
             0 => None,
             n => Some(n as usize),
         };
-        let rows = crate::solvers::polar::compute_polar_sweep_parallel_with_threads(
+        let mode = match *coeff_mode {
+            UiCoeffMode::Panel => {
+                crate::solvers::polar::PolarMode::Panel
+            }
+            UiCoeffMode::Approx => {
+                crate::solvers::polar::PolarMode::Approx
+            }
+        };
+        let res = crate::solvers::polar::compute_polar_sweep_parallel_with_system_mode(
             &params,
             &flow,
             sweep.alpha_min_deg,
             sweep.alpha_max_deg,
             sweep.alpha_step_deg,
+            None,
             threads,
+            mode,
         );
+        let rows = res.rows;
+        let used_fallback = res.used_fallback;
 
         if let Err(err) = std::fs::create_dir_all("exports") {
             warn!("failed to create exports/: {err}");
@@ -198,7 +212,11 @@ pub fn handle_export_polars_button(
         match std::fs::write(&path, out) {
             Ok(()) => {
                 info!("exported polars to {}", path.display());
-                status.message = format!("Saved: {}", path.display());
+                status.message = if used_fallback {
+                    format!("Saved (fallback used): {}", path.display())
+                } else {
+                    format!("Saved: {}", path.display())
+                };
             }
             Err(err) => {
                 warn!("failed to export polars: {err}");
@@ -669,6 +687,73 @@ pub fn update_input_mode_button_styles(
     }
 }
 
+pub fn handle_coeff_mode_buttons(
+    mut coeff_mode: ResMut<UiCoeffMode>,
+    mut q: Query<
+        (&Interaction, &CoeffModeButton),
+        Changed<Interaction>,
+    >,
+) {
+    for (interaction, button) in &mut q {
+        if matches!(*interaction, Interaction::Pressed) {
+            *coeff_mode = button.mode;
+        }
+    }
+}
+
+pub fn update_coeff_mode_button_styles(
+    coeff_mode: Res<UiCoeffMode>,
+    mut commands: Commands,
+    mut q: Query<(
+        Entity,
+        &CoeffModeButton,
+        Option<&ThemeBackgroundColor>,
+        Option<&ThemeFontColor>,
+    )>,
+) {
+    if !coeff_mode.is_changed() {
+        return;
+    }
+    for (entity, button, bg, font) in &mut q {
+        let selected = button.mode == *coeff_mode;
+        let desired_bg = if selected {
+            tokens::BUTTON_PRIMARY_BG
+        } else {
+            tokens::BUTTON_BG
+        };
+        let desired_font = if selected {
+            tokens::BUTTON_PRIMARY_TEXT
+        } else {
+            tokens::BUTTON_TEXT
+        };
+
+        let bg_ok = bg.is_some_and(|t| t.0 == desired_bg);
+        let font_ok = font.is_some_and(|t| t.0 == desired_font);
+        if !bg_ok || !font_ok {
+            commands.entity(entity).insert((
+                ThemeBackgroundColor(desired_bg),
+                ThemeFontColor(desired_font),
+            ));
+        }
+    }
+}
+
+pub fn update_fallback_warning_badge(
+    diag: Res<SolverDiagnostics>,
+    mut q: Query<&mut Node, With<FallbackWarningBadge>>,
+) {
+    if !diag.is_changed() {
+        return;
+    }
+    for mut node in &mut q {
+        node.display = if diag.fallback_active {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+}
+
 pub fn update_numeric_input_visibility(
     input_mode: Res<UiInputMode>,
     mut focus: ResMut<NumericInputFocus>,
@@ -705,10 +790,14 @@ pub fn update_numeric_input_visibility(
 pub fn update_table_text(
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
+    coeff_mode: Res<UiCoeffMode>,
     mut query: Query<(&mut Text, &TableField)>,
     mut cache: Local<UiPanelSystemCache>,
 ) {
-    if !params.is_changed() && !flow.is_changed() {
+    if !params.is_changed()
+        && !flow.is_changed()
+        && !coeff_mode.is_changed()
+    {
         return;
     }
 
@@ -719,13 +808,31 @@ pub fn update_table_text(
         cache.system = PanelLuSystem::new(&params);
     }
 
-    let panel_sol = cache
-        .system
-        .as_ref()
-        .map(|sys| sys.panel_solution(&params, flow.alpha_deg))
-        .unwrap_or_else(|| {
-            compute_panel_solution(&params, flow.alpha_deg)
-        });
+    let panel_sol = match *coeff_mode {
+        UiCoeffMode::Approx => {
+            crate::solvers::panel::compute_approx_solution(
+                &params,
+                flow.alpha_deg,
+            )
+        }
+        UiCoeffMode::Panel => {
+            let sol = cache
+                .system
+                .as_ref()
+                .map(|sys| sys.panel_solution(&params, flow.alpha_deg))
+                .unwrap_or_else(|| {
+                    compute_panel_solution(&params, flow.alpha_deg)
+                });
+            if sol.x.is_empty() {
+                crate::solvers::panel::compute_approx_solution(
+                    &params,
+                    flow.alpha_deg,
+                )
+            } else {
+                sol
+            }
+        }
+    };
     let est_cl = panel_sol.cl().unwrap_or(f32::NAN);
     let est_cm = panel_sol.cm_c4().unwrap_or(f32::NAN);
     let beta = (1.0 - flow.mach * flow.mach).clamp(0.05, 1.0).sqrt();

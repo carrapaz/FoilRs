@@ -15,9 +15,10 @@ use bevy::{
 use crate::state::NacaParams;
 
 use super::super::types::{
-    ExportPolarsButton, ExportStatusText, InputModeButton, NacaHeading,
-    ThemeToggleButton, TopBar, UiColorThemeMode, UiInputMode,
-    ViewButton, VisualMode,
+    CoeffModeButton, ExportPolarsButton, ExportStatusText,
+    FallbackWarningBadge, FallbackWarningText, InputModeButton,
+    NacaHeading, ThemeToggleButton, TopBar, UiCoeffMode,
+    UiColorThemeMode, UiInputMode, ViewButton, VisualMode,
 };
 
 const TOP_BAR_HEIGHT: f32 = 56.0;
@@ -28,6 +29,7 @@ pub(super) fn spawn_top_bar(
     params: &NacaParams,
     mode: VisualMode,
     input_mode: UiInputMode,
+    coeff_mode: UiCoeffMode,
     theme_mode: UiColorThemeMode,
     export_status: &str,
 ) {
@@ -144,6 +146,47 @@ pub(super) fn spawn_top_bar(
                     InputModeButton { mode: mode_option },
                 );
             }
+
+            spawn_themed_text(
+                tabs,
+                "Coeffs",
+                ui_font.clone(),
+                13.0,
+                tokens::TEXT_DIM,
+                (),
+            );
+            for &coeff_option in
+                &[UiCoeffMode::Panel, UiCoeffMode::Approx]
+            {
+                spawn_pill_button(
+                    tabs,
+                    coeff_option.label(),
+                    ui_font.clone(),
+                    coeff_option == coeff_mode,
+                    CoeffModeButton { mode: coeff_option },
+                );
+            }
+
+            tabs.spawn((
+                Node {
+                    padding: UiRect::axes(Val::Px(6.0), Val::Px(0.0)),
+                    display: Display::None,
+                    ..default()
+                },
+                FallbackWarningBadge,
+            ))
+            .with_children(|warn| {
+                warn.spawn((
+                    Text::new("fallback"),
+                    TextFont {
+                        font: ui_font.clone(),
+                        font_size: 12.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(1.0, 0.7, 0.3)),
+                    FallbackWarningText,
+                ));
+            });
         });
 
         bar.spawn(Node {

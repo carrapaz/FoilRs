@@ -7,7 +7,9 @@ use bevy::{
 use crate::airfoil::build_naca_body_geometry;
 use crate::plotter::{CpPlotLabels, PolarPlotLabels};
 use crate::state::{FlowSettings, NacaParams};
-use crate::ui::{PolarSweepSettings, VisualMode};
+use crate::ui::{
+    PolarSweepSettings, SolverDiagnostics, UiCoeffMode, VisualMode,
+};
 
 mod cp_view;
 mod field_view;
@@ -66,13 +68,14 @@ pub struct VizCache {
     panel_key: Option<(NacaKey, u32)>,
     panel_prims: PanelPrimitives,
 
-    cp_key: Option<(NacaKey, u32, u32, u32, u32, u32, bool)>,
+    cp_key: Option<(NacaKey, u32, u32, u32, u32, u32, bool, u8)>,
     cp_prims: Option<CpGraphPrimitives>,
+    cp_used_fallback: bool,
     cp_labels_key: Option<(u32, u32)>,
     cp_labels_dirty: bool,
 
     polar_key:
-        Option<(NacaKey, u32, u32, bool, bool, u32, u32, u32, u8)>,
+        Option<(NacaKey, u32, u32, bool, bool, u32, u32, u32, u8, u8)>,
     polar_prims: Option<PolarGraphPrimitives>,
     polar_labels_dirty: bool,
 }
@@ -86,10 +89,13 @@ pub fn draw_airfoil_and_visualization(
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
     sweep: Res<PolarSweepSettings>,
+    coeff_mode: Res<UiCoeffMode>,
     mode: Res<VisualMode>,
+    mut diag: ResMut<SolverDiagnostics>,
     mut gizmos: Gizmos,
     mut cache: Local<VizCache>,
 ) {
+    diag.fallback_active = false;
     let draw_alpha_deg = if *mode == VisualMode::Polars {
         0.0
     } else {
@@ -108,6 +114,7 @@ pub fn draw_airfoil_and_visualization(
         cache.panel_key = None;
         cache.cp_key = None;
         cache.cp_prims = None;
+        cache.cp_used_fallback = false;
         cache.polar_key = None;
         cache.polar_prims = None;
         cache.polar_labels_dirty = true;
@@ -233,16 +240,21 @@ pub fn draw_airfoil_and_visualization(
                 base_y.to_bits(),
                 scale_y.to_bits(),
                 flow.viscous,
+                *coeff_mode as u8,
             );
             if cache.cp_key != Some(key) {
                 cache.cp_key = Some(key);
-                cache.cp_prims = compute_cp_graph_primitives(
-                    &params,
-                    &flow,
-                    base_y,
-                    scale_y,
-                    cache.panel_system.as_ref(),
-                );
+                let (prims, used_fallback) =
+                    compute_cp_graph_primitives(
+                        &params,
+                        &flow,
+                        base_y,
+                        scale_y,
+                        cache.panel_system.as_ref(),
+                        *coeff_mode,
+                    );
+                cache.cp_prims = prims;
+                cache.cp_used_fallback = used_fallback;
             }
 
             let labels_key = (base_y.to_bits(), scale_y.to_bits());
@@ -254,6 +266,7 @@ pub fn draw_airfoil_and_visualization(
             let Some(prims) = cache.cp_prims.as_ref() else {
                 return;
             };
+            diag.fallback_active = cache.cp_used_fallback;
 
             let refresh_labels =
                 cache.cp_labels_dirty || cp_labels.entities.is_empty();
@@ -288,6 +301,7 @@ pub fn draw_airfoil_and_visualization(
                 sweep.alpha_max_deg.to_bits(),
                 sweep.alpha_step_deg.to_bits(),
                 sweep.threads,
+                *coeff_mode as u8,
             );
             if cache.polar_key != Some(key) {
                 cache.polar_key = Some(key);
@@ -299,6 +313,7 @@ pub fn draw_airfoil_and_visualization(
                     sweep.alpha_step_deg,
                     threads,
                     cache.panel_system.as_ref(),
+                    *coeff_mode,
                 ));
                 cache.polar_labels_dirty = true;
             }
@@ -310,6 +325,7 @@ pub fn draw_airfoil_and_visualization(
             let Some(prims) = cache.polar_prims.as_ref() else {
                 return;
             };
+            diag.fallback_active = prims.used_fallback;
             draw_polar_primitives(
                 prims,
                 &mut gizmos,

@@ -16,7 +16,7 @@ use crate::state::{FlowSettings, NacaParams};
 use super::types::{
     ExportStatus, LeftPanelMainControls, LeftPanelPanelControls,
     ModePanel, PanelSections, PolarSweepSettings, PolarsControls,
-    UiColorThemeMode, UiInputMode, UiRoot, VisualMode,
+    UiCoeffMode, UiColorThemeMode, UiInputMode, UiRoot, VisualMode,
 };
 
 pub fn setup_ui(
@@ -28,6 +28,7 @@ pub fn setup_ui(
     mode: Res<VisualMode>,
     sections: Res<PanelSections>,
     input_mode: Res<UiInputMode>,
+    coeff_mode: Res<UiCoeffMode>,
     theme_mode: Res<UiColorThemeMode>,
     export_status: Res<ExportStatus>,
 ) {
@@ -40,6 +41,7 @@ pub fn setup_ui(
         *mode,
         &sections,
         *input_mode,
+        *coeff_mode,
         *theme_mode,
         &export_status,
     );
@@ -54,6 +56,7 @@ pub(super) fn spawn_ui_root(
     mode: VisualMode,
     sections: &PanelSections,
     input_mode: UiInputMode,
+    coeff_mode: UiCoeffMode,
     theme_mode: UiColorThemeMode,
     export_status: &ExportStatus,
 ) -> Entity {
@@ -76,6 +79,7 @@ pub(super) fn spawn_ui_root(
             params,
             mode,
             input_mode,
+            coeff_mode,
             theme_mode,
             &export_status.message,
         );

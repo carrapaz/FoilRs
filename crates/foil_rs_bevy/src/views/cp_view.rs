@@ -4,6 +4,7 @@ use crate::{
     plotter::{CpPlotLabels, refresh_cp_labels},
     solvers,
     state::{FlowSettings, NacaParams},
+    ui::UiCoeffMode,
     views::CHORD_PX,
 };
 
@@ -38,17 +39,34 @@ pub(super) fn compute_cp_graph_primitives(
     base_y: f32,
     scale_y: f32,
     panel_system: Option<&crate::solvers::panel::PanelLuSystem>,
-) -> Option<CpGraphPrimitives> {
-    // Use the more stable analytic approximation for visualization; the
-    // panel solver can be noisier for Cp curves.
-    let sol = panel_system
-        .map(|sys| sys.panel_solution(params, flow.alpha_deg))
-        .unwrap_or_else(|| {
-            solvers::compute_panel_solution(params, flow.alpha_deg)
-        });
-    if sol.x.is_empty() {
-        return None;
-    }
+    coeff_mode: UiCoeffMode,
+) -> (Option<CpGraphPrimitives>, bool) {
+    let mut used_fallback = false;
+    let sol = match coeff_mode {
+        UiCoeffMode::Approx => solvers::panel::compute_approx_solution(
+            params,
+            flow.alpha_deg,
+        ),
+        UiCoeffMode::Panel => {
+            let sol = panel_system
+                .map(|sys| sys.panel_solution(params, flow.alpha_deg))
+                .unwrap_or_else(|| {
+                    solvers::compute_panel_solution(
+                        params,
+                        flow.alpha_deg,
+                    )
+                });
+            if sol.x.is_empty() {
+                used_fallback = true;
+                solvers::panel::compute_approx_solution(
+                    params,
+                    flow.alpha_deg,
+                )
+            } else {
+                sol
+            }
+        }
+    };
 
     let mut upper_pts = Vec::with_capacity(sol.x.len());
     let mut lower_pts = Vec::with_capacity(sol.x.len());
@@ -63,10 +81,13 @@ pub(super) fn compute_cp_graph_primitives(
         lower_pts.push(Vec2::new(world_x, base_y - cp_l * scale_y));
     }
 
-    Some(CpGraphPrimitives {
-        upper_pts,
-        lower_pts,
-    })
+    (
+        Some(CpGraphPrimitives {
+            upper_pts,
+            lower_pts,
+        }),
+        used_fallback,
+    )
 }
 
 /// Draw Cp(x) graph below the airfoil, in “screen-ish” coordinates.

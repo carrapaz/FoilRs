@@ -3,6 +3,7 @@ use bevy::{color::palettes::css, prelude::*};
 use crate::{
     plotter::{PolarPlotLabels, refresh_polar_labels},
     state::{FlowSettings, NacaParams},
+    ui::UiCoeffMode,
     views::CHORD_PX,
 };
 
@@ -19,6 +20,7 @@ const CD_COLOR: Color = Color::srgb(0.95, 0.55, 0.25);
 pub(super) struct PolarGraphPrimitives {
     pub cl_pts: Vec<Vec2>,
     pub cd_pts: Vec<Vec2>,
+    pub used_fallback: bool,
 }
 
 pub(super) fn compute_polar_primitives(
@@ -29,17 +31,24 @@ pub(super) fn compute_polar_primitives(
     alpha_step_deg: f32,
     threads: Option<usize>,
     panel_system: Option<&crate::solvers::panel::PanelLuSystem>,
+    coeff_mode: UiCoeffMode,
 ) -> PolarGraphPrimitives {
-    let rows =
-        crate::solvers::polar::compute_polar_sweep_parallel_with_system(
-            params,
-            flow,
-            alpha_min_deg,
-            alpha_max_deg,
-            alpha_step_deg,
-            panel_system,
-            threads,
-        );
+    let mode = match coeff_mode {
+        UiCoeffMode::Panel => crate::solvers::polar::PolarMode::Panel,
+        UiCoeffMode::Approx => crate::solvers::polar::PolarMode::Approx,
+    };
+    let res = crate::solvers::polar::compute_polar_sweep_parallel_with_system_mode(
+        params,
+        flow,
+        alpha_min_deg,
+        alpha_max_deg,
+        alpha_step_deg,
+        panel_system,
+        threads,
+        mode,
+    );
+    let rows = res.rows;
+    let used_fallback = res.used_fallback;
 
     let mut cl_pts = Vec::with_capacity(rows.len());
     let mut cd_pts = Vec::with_capacity(rows.len());
@@ -56,7 +65,11 @@ pub(super) fn compute_polar_primitives(
         cd_pts.push(Vec2::new(x, CD_BASE_Y + cd * CD_SCALE_Y));
     }
 
-    PolarGraphPrimitives { cl_pts, cd_pts }
+    PolarGraphPrimitives {
+        cl_pts,
+        cd_pts,
+        used_fallback,
+    }
 }
 
 pub(super) fn draw_polar_primitives(

@@ -86,6 +86,32 @@ pub struct PanelSections {
     pub polars_open: bool,
 }
 
+#[derive(Resource, Clone, Copy, PartialEq, Eq)]
+pub enum UiCoeffMode {
+    Panel,
+    Approx,
+}
+
+impl Default for UiCoeffMode {
+    fn default() -> Self {
+        Self::Panel
+    }
+}
+
+impl UiCoeffMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Panel => "Panel",
+            Self::Approx => "Approx",
+        }
+    }
+}
+
+#[derive(Resource, Default, Clone)]
+pub struct SolverDiagnostics {
+    pub fallback_active: bool,
+}
+
 impl Default for PanelSections {
     fn default() -> Self {
         Self {
@@ -164,6 +190,17 @@ pub struct ExportStatusText;
 
 #[derive(Component)]
 pub struct ThemeToggleButton;
+
+#[derive(Component)]
+pub struct CoeffModeButton {
+    pub mode: UiCoeffMode,
+}
+
+#[derive(Component)]
+pub struct FallbackWarningText;
+
+#[derive(Component)]
+pub struct FallbackWarningBadge;
 
 #[derive(Resource, Default, Clone)]
 pub struct ExportStatus {

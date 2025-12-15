@@ -225,7 +225,7 @@ impl PanelLuSystem {
 
         let Some((sources, gamma)) = self.solve(freestream) else {
             let (cl, cm_c4, _) =
-                analytic_section_coeffs(params, alpha_deg);
+                approx_section_coeffs(params, alpha_deg);
             return PanelSolution {
                 x: Vec::new(),
                 cp_upper: Vec::new(),
@@ -248,9 +248,11 @@ impl PanelLuSystem {
     }
 }
 
-/// Heuristic section coefficients (thin-airfoil-inspired) to provide stable
-/// values and a rough match to XFoil for 4-digit NACA foils.
-pub fn analytic_section_coeffs(
+/// Approximate section coefficients (thin-airfoil-inspired).
+///
+/// This is used as a *fallback* when the panel solver fails, and as the basis
+/// for the explicit "Approx" mode in the UI.
+pub fn approx_section_coeffs(
     params: &NacaParams,
     alpha_deg: f32,
 ) -> (f32, f32, f32) {
@@ -271,6 +273,14 @@ pub fn analytic_section_coeffs(
     (cl, cm_c4, cdp)
 }
 
+/// Backwards-compatible name for `approx_section_coeffs`.
+pub fn analytic_section_coeffs(
+    params: &NacaParams,
+    alpha_deg: f32,
+) -> (f32, f32, f32) {
+    approx_section_coeffs(params, alpha_deg)
+}
+
 /// Simple constant-strength vortex panel method with a Kutta condition.
 pub fn compute_panel_solution(
     params: &NacaParams,
@@ -286,7 +296,7 @@ pub fn compute_panel_solution(
     let panels = build_panels(&geometry);
 
     if panels.len() < 4 {
-        let (cl, cm_c4, _) = analytic_section_coeffs(params, alpha_deg);
+        let (cl, cm_c4, _) = approx_section_coeffs(params, alpha_deg);
         return PanelSolution {
             x: Vec::new(),
             cp_upper: Vec::new(),
@@ -302,7 +312,7 @@ pub fn compute_panel_solution(
     let strengths = solve_linear_system(system);
 
     if strengths.len() != panels.len() + 1 {
-        let (cl, cm_c4, _) = analytic_section_coeffs(params, alpha_deg);
+        let (cl, cm_c4, _) = approx_section_coeffs(params, alpha_deg);
         return PanelSolution {
             x: Vec::new(),
             cp_upper: Vec::new(),
@@ -330,6 +340,14 @@ pub fn compute_panel_solution(
 /// Quick analytic fallback (old toy model) used for visualization when the
 /// full panel solution is too noisy for Cp plotting.
 pub fn compute_cp_approx(
+    params: &NacaParams,
+    alpha_deg: f32,
+) -> PanelSolution {
+    compute_fallback_solution(params, alpha_deg)
+}
+
+/// Explicit approximation mode (cheap, stable): does *not* run the panel solver.
+pub fn compute_approx_solution(
     params: &NacaParams,
     alpha_deg: f32,
 ) -> PanelSolution {
@@ -430,12 +448,12 @@ fn build_panel_solution_from_strengths(
         lower_coords.push(upper_point);
     }
 
-    let (cl_analytic, cm_c4_analytic, _) =
-        analytic_section_coeffs(params, alpha_deg);
+    let (cl_approx, cm_c4_approx, _) =
+        approx_section_coeffs(params, alpha_deg);
     let cl_cached =
-        integrate_cl_from_cp(&xs, &cp_u, &cp_l).or(Some(cl_analytic));
+        integrate_cl_from_cp(&xs, &cp_u, &cp_l).or(Some(cl_approx));
     let cm_c4_cached = integrate_cm_c4_from_cp(&xs, &cp_u, &cp_l)
-        .or(Some(cm_c4_analytic));
+        .or(Some(cm_c4_approx));
     PanelSolution {
         x: xs,
         cp_upper: cp_u,
@@ -871,7 +889,7 @@ fn compute_fallback_solution(
     }
 
     let (cl_cached, cm_c4_cached, _) =
-        analytic_section_coeffs(params, alpha_deg);
+        approx_section_coeffs(params, alpha_deg);
     PanelSolution {
         x: xs,
         cp_upper: cp_u,

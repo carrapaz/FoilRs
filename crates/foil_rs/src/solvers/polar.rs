@@ -20,6 +20,22 @@ pub struct PolarRow {
     pub probable_stall: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PolarMode {
+    /// Solve with the panel system and derive coefficients from Cp.
+    Panel,
+    /// Use the cheap approximate Cp/coefficients model.
+    Approx,
+}
+
+#[derive(Clone, Debug)]
+pub struct PolarSweepResult {
+    pub rows: Vec<PolarRow>,
+    /// True if `PolarMode::Panel` was requested but the solver fell back to
+    /// approximation for at least one alpha (e.g. singular/invalid solve).
+    pub used_fallback: bool,
+}
+
 pub fn default_polar_sweep() -> (f32, f32, f32) {
     (
         DEFAULT_ALPHA_MIN_DEG,
@@ -43,6 +59,157 @@ pub fn compute_polar_sweep(
         alpha_step_deg,
         None,
     )
+}
+
+pub fn compute_polar_sweep_parallel_with_system_mode(
+    params: &NacaParams,
+    flow: &FlowSettings,
+    alpha_min_deg: f32,
+    alpha_max_deg: f32,
+    alpha_step_deg: f32,
+    system: Option<&PanelLuSystem>,
+    threads: Option<usize>,
+    mode: PolarMode,
+) -> PolarSweepResult {
+    let (alphas, capacity) =
+        alpha_samples(alpha_min_deg, alpha_max_deg, alpha_step_deg);
+    if alphas.is_empty() {
+        return PolarSweepResult {
+            rows: Vec::new(),
+            used_fallback: false,
+        };
+    }
+
+    if mode == PolarMode::Approx {
+        let beta =
+            (1.0 - flow.mach * flow.mach).clamp(0.05, 1.0).sqrt();
+        let bl_inputs = BoundaryLayerInputs::new(
+            flow.reynolds,
+            flow.mach,
+            flow.viscous,
+            flow.free_transition,
+            DEFAULT_FORCED_TRIP_X,
+        );
+        let bl_inputs = &bl_inputs;
+
+        let mut rows = Vec::with_capacity(capacity);
+        for &a in &alphas {
+            let sol = super::panel::compute_approx_solution(params, a);
+            rows.push(polar_row(&sol, a, beta, bl_inputs));
+        }
+        return PolarSweepResult {
+            rows,
+            used_fallback: false,
+        };
+    }
+
+    // Panel mode.
+    let owned_system;
+    let system = match system {
+        Some(sys) => Some(sys),
+        None => {
+            owned_system = PanelLuSystem::new(params);
+            owned_system.as_ref()
+        }
+    };
+
+    let beta = (1.0 - flow.mach * flow.mach).clamp(0.05, 1.0).sqrt();
+    let bl_inputs = BoundaryLayerInputs::new(
+        flow.reynolds,
+        flow.mach,
+        flow.viscous,
+        flow.free_transition,
+        DEFAULT_FORCED_TRIP_X,
+    );
+    let bl_inputs = &bl_inputs;
+
+    // If we couldn't build a cached system, fall back to approximation for
+    // all alphas.
+    let Some(system) = system else {
+        let mut rows = Vec::with_capacity(capacity);
+        for &a in &alphas {
+            let sol = super::panel::compute_approx_solution(params, a);
+            rows.push(polar_row(&sol, a, beta, bl_inputs));
+        }
+        return PolarSweepResult {
+            rows,
+            used_fallback: true,
+        };
+    };
+
+    let available = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+    let mut thread_count = threads.unwrap_or(available).max(1);
+    thread_count = thread_count.min(alphas.len());
+
+    if thread_count <= 1 {
+        let mut used_fallback = false;
+        let mut rows = Vec::with_capacity(capacity);
+        for &a in &alphas {
+            let sol = system.panel_solution(params, a);
+            used_fallback |= sol.x.is_empty();
+            let sol = if sol.x.is_empty() {
+                super::panel::compute_approx_solution(params, a)
+            } else {
+                sol
+            };
+            rows.push(polar_row(&sol, a, beta, bl_inputs));
+        }
+        return PolarSweepResult {
+            rows,
+            used_fallback,
+        };
+    }
+
+    let chunk_size = (alphas.len() + thread_count - 1) / thread_count;
+    let mut chunks: Vec<(Vec<PolarRow>, bool)> =
+        Vec::with_capacity(thread_count);
+
+    std::thread::scope(|scope| {
+        let mut handles = Vec::with_capacity(thread_count);
+        for chunk_idx in 0..thread_count {
+            let start = chunk_idx * chunk_size;
+            if start >= alphas.len() {
+                break;
+            }
+            let end = ((chunk_idx + 1) * chunk_size).min(alphas.len());
+            let alpha_slice = &alphas[start..end];
+
+            handles.push(scope.spawn(move || {
+                let mut used_fallback = false;
+                let mut rows = Vec::with_capacity(alpha_slice.len());
+                for &a in alpha_slice {
+                    let sol = system.panel_solution(params, a);
+                    used_fallback |= sol.x.is_empty();
+                    let sol = if sol.x.is_empty() {
+                        super::panel::compute_approx_solution(params, a)
+                    } else {
+                        sol
+                    };
+                    rows.push(polar_row(&sol, a, beta, bl_inputs));
+                }
+                (rows, used_fallback)
+            }));
+        }
+
+        for h in handles {
+            chunks
+                .push(h.join().unwrap_or_else(|_| (Vec::new(), true)));
+        }
+    });
+
+    let total: usize = chunks.iter().map(|c| c.0.len()).sum();
+    let used_fallback = chunks.iter().any(|c| c.1);
+    let mut rows = Vec::with_capacity(total);
+    for (mut c, _) in chunks {
+        rows.append(&mut c);
+    }
+
+    PolarSweepResult {
+        rows,
+        used_fallback,
+    }
 }
 
 pub fn compute_polar_sweep_parallel(

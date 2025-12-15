@@ -20,10 +20,12 @@ fn main() {
         .insert_resource(FlowSettings::default())
         .insert_resource(ui::PolarSweepSettings::default())
         .insert_resource(VisualMode::Field)
+        .init_resource::<ui::UiCoeffMode>()
         .init_resource::<ui::UiInputMode>()
         .insert_resource(ui::PanelSections::default())
         .init_resource::<ui::NumericInputFocus>()
         .init_resource::<ui::ExportStatus>()
+        .init_resource::<ui::SolverDiagnostics>()
         .init_resource::<plotter::CpPlotLabels>()
         .init_resource::<plotter::PolarPlotLabels>()
         // Plugins
@@ -70,6 +72,14 @@ fn main() {
                 ui::handle_flow_toggle_buttons,
                 ui::handle_input_mode_buttons,
                 ui::update_input_mode_button_styles,
+            ),
+        )
+        .add_systems(
+            Update,
+            (
+                ui::handle_coeff_mode_buttons,
+                ui::update_coeff_mode_button_styles,
+                ui::update_fallback_warning_badge,
                 ui::update_numeric_input_visibility,
                 ui::handle_numeric_input_focus,
                 ui::handle_numeric_input_edit,
