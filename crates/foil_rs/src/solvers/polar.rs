@@ -81,6 +81,39 @@ pub fn compute_polar_sweep_parallel_with_threads(
     )
 }
 
+pub fn compute_multi_polar_sweeps(
+    params: &NacaParams,
+    flows: &[FlowSettings],
+    alpha_min_deg: f32,
+    alpha_max_deg: f32,
+    alpha_step_deg: f32,
+    threads: Option<usize>,
+) -> Vec<(FlowSettings, Vec<PolarRow>)> {
+    let mut out = Vec::with_capacity(flows.len());
+    for flow in flows {
+        let rows = if threads.unwrap_or(1) <= 1 {
+            compute_polar_sweep(
+                params,
+                flow,
+                alpha_min_deg,
+                alpha_max_deg,
+                alpha_step_deg,
+            )
+        } else {
+            compute_polar_sweep_parallel_with_threads(
+                params,
+                flow,
+                alpha_min_deg,
+                alpha_max_deg,
+                alpha_step_deg,
+                threads,
+            )
+        };
+        out.push((flow.clone(), rows));
+    }
+    out
+}
+
 pub(crate) fn compute_polar_sweep_with_system(
     params: &NacaParams,
     flow: &FlowSettings,

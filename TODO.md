@@ -32,10 +32,10 @@
 - [x] Support Mach/Re inputs, transition modeling, and viscosity toggles so solver inputs match real-world conditions.
 - [x] Make field/Cp visualizations respond to Mach/Re/viscosity (PG scaling + viscous masking/damping).
 - [x] Show panel discretization controls only in Panels view (hide geometry/flow controls there).
+- [x] Expand test coverage and reference data (symmetric foils + polar sweep invariants) to keep the solver calibrated.
 
 ### Essential for a truly useful release
-- [x] Expand test coverage and reference data (symmetric foils + polar sweep invariants) to keep the solver calibrated.
-- [ ] Support multi-polars across Re/M (multiple curves + CSV) for XFOIL comparison.
+- [x] Support multi-polars across Re/M (multiple curves + CSV) for XFOIL comparison (headless export + core API).
 - [ ] Allow importing/saving arbitrary airfoil shapes (e.g., .dat) with cosine spacing and normalization utilities.
 - [ ] UI polish for production use: richer charts (Cp annotations, polar plots), presets/reset, tooltips, run/stop controls.
 - [ ] Support geometry/solver diagnostics: visualize panel discretization (midpoints, normals, circulation) similar to XFOIL.

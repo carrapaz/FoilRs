@@ -109,6 +109,16 @@ cargo run -p foil_rs --example export_polar_csv --release -- 2412
 
 Args (all optional): `NACA REYNOLDS MACH VISCOUS FREE_TRANSITION ALPHA_MIN ALPHA_MAX ALPHA_STEP THREADS OUT_PATH`
 
+### Export multi-polars CSV (headless)
+
+Writes a combined CSV containing multiple α-sweep curves across Reynolds/Mach pairs:
+
+```bash
+cargo run -p foil_rs --example export_multi_polars_csv --release -- 2412 "0.5,1.0,2.0" "0.0,0.1"
+```
+
+Args (all optional): `NACA RE_MILLIONS_LIST MACH_LIST VISCOUS FREE_TRANSITION ALPHA_MIN ALPHA_MAX ALPHA_STEP THREADS OUT_PATH`
+
 ### Controls
 
 - **View selector**: top bar → `View` (Field / Cp(x) / Polars / Panels)
