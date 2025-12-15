@@ -1,11 +1,11 @@
 ## TODO
 
 ### Next up (code health + scalability)
-- [ ] (Perf) Allow boundary-layer integration to reuse a scratch buffer / avoid repeated allocations.
-- [ ] Improve headless benchmarking harness (warmup, multi-run stats, optional criterion behind dev-dep).
 - [ ] Consider splitting into `foil_rs_core` + `foil_rs_bevy` crates for long-term scalability (core solver/lib vs UI/app).
 
 ### Completed
+- [x] Improve headless benchmarking harness (warmup, multi-run stats).
+- [x] (Perf) Make boundary-layer integration allocation-free in sweeps.
 - [x] Unify theming: rely on Feathers theme tokens + `ThemeBackgroundColor`/`ThemeBorderColor` instead of spawning hard-coded colors.
 - [x] Remove UI rebuild-on-theme-toggle (preserve UI state like focus/sections; scale to more widgets).
 - [x] Deduplicate common UI “pill button” spawning patterns in `src/ui/layout/topbar.rs`.

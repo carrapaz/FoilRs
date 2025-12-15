@@ -97,7 +97,7 @@ Quick timing harness (no extra deps), recommended in `--release`:
 cargo run --example bench_headless --no-default-features --release -- 2412 4.0
 ```
 
-Args (all optional): `NACA ALPHA_DEG PANEL_ITERS POLAR_ITERS ALPHA_MIN ALPHA_MAX ALPHA_STEP THREADS`
+Args (all optional): `NACA ALPHA_DEG PANEL_ITERS POLAR_ITERS ALPHA_MIN ALPHA_MAX ALPHA_STEP THREADS RUNS WARMUP_RUNS`
 
 ### Export polars CSV (headless)
 
