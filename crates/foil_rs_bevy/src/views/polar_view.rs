@@ -70,17 +70,26 @@ pub(super) fn draw_polar_primitives(
     alpha_max_deg: f32,
 ) {
     let alpha_ticks = alpha_tick_values(alpha_min_deg, alpha_max_deg);
-    draw_axes(gizmos, &alpha_ticks, alpha_min_deg, alpha_max_deg);
+    let cl_ticks = [-1.0, -0.5, 0.0, 0.5, 1.0];
+    let cd_ticks = [0.0, 0.005, 0.010, 0.015, 0.020];
+    draw_axes(
+        gizmos,
+        alpha_min_deg,
+        alpha_max_deg,
+        &alpha_ticks,
+        &cl_ticks,
+        &cd_ticks,
+    );
 
     if refresh_labels {
-        let cl_ticks = [-1.0, -0.5, 0.0, 0.5, 1.0];
-        let cd_ticks = [0.0, 0.005, 0.010, 0.015, 0.020];
         refresh_polar_labels(
             commands,
             asset_server,
             labels,
             alpha_min_deg,
             alpha_max_deg,
+            CL_COLOR,
+            CD_COLOR,
             &alpha_ticks,
             &cl_ticks,
             &cd_ticks,
@@ -97,47 +106,105 @@ pub(super) fn draw_polar_primitives(
     if prims.cd_pts.len() >= 2 {
         gizmos.linestrip_2d(prims.cd_pts.iter().copied(), CD_COLOR);
     }
+
+    draw_point_markers(gizmos, &prims.cl_pts, CL_COLOR);
+    draw_point_markers(gizmos, &prims.cd_pts, CD_COLOR);
 }
 
 fn draw_axes(
     gizmos: &mut Gizmos,
-    alpha_ticks: &[f32],
     alpha_min_deg: f32,
     alpha_max_deg: f32,
+    alpha_ticks: &[f32],
+    cl_ticks: &[f32],
+    cd_ticks: &[f32],
 ) {
     let axis_color = Color::from(css::GRAY).with_alpha(0.65);
+    let grid_color = Color::from(css::GRAY).with_alpha(0.18);
+    let box_color = Color::from(css::GRAY).with_alpha(0.25);
 
     // Shared alpha axis (bottom of each plot)
-    let left = Vec2::new(-0.5 * CHORD_PX, 0.0);
-    let right = Vec2::new(0.5 * CHORD_PX, 0.0);
+    let x_left = -0.5 * CHORD_PX;
+    let x_right = 0.5 * CHORD_PX;
 
     // CL axis line at y=CL_BASE_Y
     gizmos.line_2d(
-        Vec2::new(left.x, CL_BASE_Y),
-        Vec2::new(right.x, CL_BASE_Y),
+        Vec2::new(x_left, CL_BASE_Y),
+        Vec2::new(x_right, CL_BASE_Y),
         axis_color,
     );
 
     // CD axis line at y=CD_BASE_Y
     gizmos.line_2d(
-        Vec2::new(left.x, CD_BASE_Y),
-        Vec2::new(right.x, CD_BASE_Y),
+        Vec2::new(x_left, CD_BASE_Y),
+        Vec2::new(x_right, CD_BASE_Y),
         axis_color,
     );
 
-    // Vertical ticks for alpha on both axes
+    // Plot boxes help convey that these are two stacked plots.
+    let cl_tick_min = cl_ticks.first().copied().unwrap_or(-1.0);
+    let cl_tick_max = cl_ticks.last().copied().unwrap_or(1.0);
+    let cd_tick_min = cd_ticks.first().copied().unwrap_or(0.0);
+    let cd_tick_max = cd_ticks.last().copied().unwrap_or(0.02);
+
+    let cl_y_min = CL_BASE_Y + cl_tick_min * CL_SCALE_Y;
+    let cl_y_max = CL_BASE_Y + cl_tick_max * CL_SCALE_Y;
+    let cd_y_min = CD_BASE_Y + cd_tick_min * CD_SCALE_Y;
+    let cd_y_max = CD_BASE_Y + cd_tick_max * CD_SCALE_Y;
+
+    draw_plot_box(
+        gizmos, x_left, x_right, cl_y_min, cl_y_max, box_color,
+    );
+    draw_plot_box(
+        gizmos, x_left, x_right, cd_y_min, cd_y_max, box_color,
+    );
+
+    // Horizontal gridlines (CL/CD).
+    for &cl in cl_ticks {
+        let y = CL_BASE_Y + cl * CL_SCALE_Y;
+        gizmos.line_2d(
+            Vec2::new(x_left, y),
+            Vec2::new(x_right, y),
+            grid_color,
+        );
+    }
+    for &cd in cd_ticks {
+        let y = CD_BASE_Y + cd * CD_SCALE_Y;
+        gizmos.line_2d(
+            Vec2::new(x_left, y),
+            Vec2::new(x_right, y),
+            grid_color,
+        );
+    }
+
+    // Vertical gridlines for alpha on both plots.
     for &a in alpha_ticks {
         let x = alpha_to_world_x(a, alpha_min_deg, alpha_max_deg);
-        let tick = 8.0;
         gizmos.line_2d(
-            Vec2::new(x, CL_BASE_Y - tick),
-            Vec2::new(x, CL_BASE_Y + tick),
-            axis_color.with_alpha(0.55),
+            Vec2::new(x, cl_y_min),
+            Vec2::new(x, cl_y_max),
+            grid_color,
         );
         gizmos.line_2d(
-            Vec2::new(x, CD_BASE_Y - tick),
-            Vec2::new(x, CD_BASE_Y + tick),
-            axis_color.with_alpha(0.55),
+            Vec2::new(x, cd_y_min),
+            Vec2::new(x, cd_y_max),
+            grid_color,
+        );
+    }
+
+    // Stronger reference line at alpha=0 if it's in-range.
+    if alpha_min_deg <= 0.0 && 0.0 <= alpha_max_deg {
+        let x0 = alpha_to_world_x(0.0, alpha_min_deg, alpha_max_deg);
+        let ref_color = Color::from(css::WHITE).with_alpha(0.22);
+        gizmos.line_2d(
+            Vec2::new(x0, cl_y_min),
+            Vec2::new(x0, cl_y_max),
+            ref_color,
+        );
+        gizmos.line_2d(
+            Vec2::new(x0, cd_y_min),
+            Vec2::new(x0, cd_y_max),
+            ref_color,
         );
     }
 }
@@ -186,4 +253,43 @@ fn alpha_tick_values(
     ticks.sort_by(|a, b| a.total_cmp(b));
     ticks.dedup_by(|a, b| (*a - *b).abs() < 1e-3);
     ticks
+}
+
+fn draw_plot_box(
+    gizmos: &mut Gizmos,
+    x_left: f32,
+    x_right: f32,
+    y_min: f32,
+    y_max: f32,
+    color: Color,
+) {
+    let a = Vec2::new(x_left, y_min);
+    let b = Vec2::new(x_right, y_min);
+    let c = Vec2::new(x_right, y_max);
+    let d = Vec2::new(x_left, y_max);
+    gizmos.line_2d(a, b, color);
+    gizmos.line_2d(b, c, color);
+    gizmos.line_2d(c, d, color);
+    gizmos.line_2d(d, a, color);
+}
+
+fn draw_point_markers(gizmos: &mut Gizmos, pts: &[Vec2], color: Color) {
+    if pts.is_empty() {
+        return;
+    }
+    let every = (pts.len() / 50).max(1);
+    let size = 3.5;
+    let c = color.with_alpha(0.75);
+    for p in pts.iter().step_by(every) {
+        gizmos.line_2d(
+            Vec2::new(p.x - size, p.y),
+            Vec2::new(p.x + size, p.y),
+            c,
+        );
+        gizmos.line_2d(
+            Vec2::new(p.x, p.y - size),
+            Vec2::new(p.x, p.y + size),
+            c,
+        );
+    }
 }

@@ -7,7 +7,7 @@ mod geometry;
 mod panels;
 
 use geometry::{
-    build_naca_body_geometry, camber_line, camber_slope,
+    build_naca_body_geometry_sharp_te, camber_line, camber_slope,
     thickness_distribution,
 };
 use panels::{Panel, build_panels};
@@ -79,6 +79,58 @@ impl PanelSolution {
     }
 }
 
+fn integrate_cl_from_cp(
+    x: &[f32],
+    cp_upper: &[f32],
+    cp_lower: &[f32],
+) -> Option<f32> {
+    if x.len() < 2
+        || x.len() != cp_upper.len()
+        || x.len() != cp_lower.len()
+    {
+        return None;
+    }
+    let mut cl = 0.0;
+    for i in 0..x.len() - 1 {
+        let dx = x[i + 1] - x[i];
+        if dx <= 0.0 {
+            continue;
+        }
+        let dcp0 = cp_lower[i] - cp_upper[i];
+        let dcp1 = cp_lower[i + 1] - cp_upper[i + 1];
+        cl += 0.5 * (dcp0 + dcp1) * dx;
+    }
+    Some(cl)
+}
+
+fn integrate_cm_c4_from_cp(
+    x: &[f32],
+    cp_upper: &[f32],
+    cp_lower: &[f32],
+) -> Option<f32> {
+    if x.len() < 2
+        || x.len() != cp_upper.len()
+        || x.len() != cp_lower.len()
+    {
+        return None;
+    }
+    let mut cm = 0.0;
+    for i in 0..x.len() - 1 {
+        let x0 = x[i];
+        let x1 = x[i + 1];
+        let dx = x1 - x0;
+        if dx <= 0.0 {
+            continue;
+        }
+        let x_avg = 0.5 * (x0 + x1);
+        let dcp0 = cp_lower[i] - cp_upper[i];
+        let dcp1 = cp_lower[i + 1] - cp_upper[i + 1];
+        let dcp_avg = 0.5 * (dcp0 + dcp1);
+        cm += dcp_avg * dx * (x_avg - 0.25);
+    }
+    Some(-cm)
+}
+
 pub struct PanelLuSystem {
     panels: Vec<Panel>,
     lu: Vec<f32>,
@@ -110,7 +162,7 @@ impl PanelFlow<'_> {
 
 impl PanelLuSystem {
     pub fn new(params: &NacaParams) -> Option<Self> {
-        let geometry = build_naca_body_geometry(params);
+        let geometry = build_naca_body_geometry_sharp_te(params);
         let panels = build_panels(&geometry);
         if panels.len() < 4 {
             return None;
@@ -230,7 +282,7 @@ pub fn compute_panel_solution(
     // space, so in body coordinates the freestream rotates with alpha.
     let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
 
-    let geometry = build_naca_body_geometry(params);
+    let geometry = build_naca_body_geometry_sharp_te(params);
     let panels = build_panels(&geometry);
 
     if panels.len() < 4 {
@@ -313,23 +365,26 @@ fn build_panel_solution_from_strengths(
         let beta = i as f32 / (sample_count - 1) as f32;
         let x_c = 0.5 * (1.0 - (PI * beta).cos());
 
-        let camber_slope = camber_slope(m, p, x_c);
+        let camber = camber_line(m, p, x_c);
+        let slope = camber_slope(m, p, x_c);
+        let theta = slope.atan();
         let thickness = thickness_distribution(t, x_c);
-
-        let theta = camber_slope.atan();
 
         // Upper and lower surfaces (body coords, chord = 1).
         let upper_point = Vec2::new(
             x_c - thickness * theta.sin(),
-            camber_line(m, p, x_c) + thickness * theta.cos(),
+            camber + thickness * theta.cos(),
         );
         let lower_point = Vec2::new(
             x_c + thickness * theta.sin(),
-            camber_line(m, p, x_c) - thickness * theta.cos(),
+            camber - thickness * theta.cos(),
         );
 
-        let tangent = Vec2::new(theta.cos(), theta.sin());
-        let tangent = tangent.normalize_or_zero();
+        // Approximate outward normals from camber-line tangent. This is not
+        // exact for the thicknessed surfaces, but is stable enough for our
+        // coarse Cp sampling.
+        let tangent =
+            Vec2::new(theta.cos(), theta.sin()).normalize_or_zero();
         let normal_upper = Vec2::new(-tangent.y, tangent.x);
         let normal_lower = Vec2::new(tangent.y, -tangent.x);
 
@@ -366,22 +421,29 @@ fn build_panel_solution_from_strengths(
         cp_lower = cp_lower.clamp(-3.0, 2.0);
 
         xs.push(x_c);
+        // Note: swapped mapping. With our current panel sign conventions this
+        // maps to the expected "upper/lower" semantics in the rest of the
+        // codebase (Cp plots, boundary layer upper/lower, CL sign).
         cp_u.push(cp_lower);
         cp_l.push(cp_upper);
         upper_coords.push(lower_point);
         lower_coords.push(upper_point);
     }
 
-    let (cl_cached, cm_c4_cached, _) =
+    let (cl_analytic, cm_c4_analytic, _) =
         analytic_section_coeffs(params, alpha_deg);
+    let cl_cached =
+        integrate_cl_from_cp(&xs, &cp_u, &cp_l).or(Some(cl_analytic));
+    let cm_c4_cached = integrate_cm_c4_from_cp(&xs, &cp_u, &cp_l)
+        .or(Some(cm_c4_analytic));
     PanelSolution {
         x: xs,
         cp_upper: cp_u,
         cp_lower: cp_l,
         upper_coords,
         lower_coords,
-        cl_cached: Some(cl_cached),
-        cm_c4_cached: Some(cm_c4_cached),
+        cl_cached,
+        cm_c4_cached,
     }
 }
 

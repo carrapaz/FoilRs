@@ -161,6 +161,7 @@ fn spawn_left_panel(
                 main,
                 asset_server,
                 flow,
+                mode,
                 sections,
                 theme_mode,
             );

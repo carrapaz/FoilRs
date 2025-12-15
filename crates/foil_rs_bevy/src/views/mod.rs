@@ -90,7 +90,12 @@ pub fn draw_airfoil_and_visualization(
     mut gizmos: Gizmos,
     mut cache: Local<VizCache>,
 ) {
-    let alpha_rad = flow.alpha_deg.to_radians();
+    let draw_alpha_deg = if *mode == VisualMode::Polars {
+        0.0
+    } else {
+        flow.alpha_deg
+    };
+    let alpha_rad = draw_alpha_deg.to_radians();
 
     let naca_key = NacaKey::from(&*params);
     if cache.naca_key != Some(naca_key) {
@@ -108,7 +113,7 @@ pub fn draw_airfoil_and_visualization(
         cache.polar_labels_dirty = true;
     }
 
-    let alpha_bits = flow.alpha_deg.to_bits();
+    let alpha_bits = draw_alpha_deg.to_bits();
     if cache.body_world_alpha_bits != Some(alpha_bits) {
         let world: Vec<Vec2> = cache
             .body

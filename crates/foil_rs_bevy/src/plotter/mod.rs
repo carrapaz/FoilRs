@@ -104,6 +104,8 @@ pub fn refresh_polar_labels(
     labels: &mut PolarPlotLabels,
     alpha_min_deg: f32,
     alpha_max_deg: f32,
+    cl_color: Color,
+    cd_color: Color,
     alpha_ticks: &[f32],
     cl_ticks: &[f32],
     cd_ticks: &[f32],
@@ -193,9 +195,10 @@ pub fn refresh_polar_labels(
     }
 
     // Plot labels (titles)
-    for (label, y) in
-        [("CL", cl_base_y + 110.0), ("CDp", cd_base_y + 90.0)]
-    {
+    for (label, y) in [
+        ("CL vs α", cl_base_y + 110.0),
+        ("CDp vs α", cd_base_y + 90.0),
+    ] {
         let ent = commands
             .spawn((
                 Text2d::new(label),
@@ -211,4 +214,59 @@ pub fn refresh_polar_labels(
             .id();
         labels.entities.push(ent);
     }
+
+    // Shared x-axis label
+    let ent = commands
+        .spawn((
+            Text2d::new("α (deg)"),
+            TextFont {
+                font: font.clone(),
+                font_size,
+                ..default()
+            },
+            TextLayout::new_with_justify(Justify::Center),
+            TextColor(color.with_alpha(0.9)),
+            Transform::from_translation(Vec3::new(
+                0.0,
+                cd_base_y - 42.0,
+                1.0,
+            )),
+        ))
+        .id();
+    labels.entities.push(ent);
+
+    // Legend under the plot, colored to match the lines.
+    let legend_y = cd_base_y - 70.0;
+
+    let ent = commands
+        .spawn((
+            Text2d::new("CL"),
+            TextFont {
+                font: font.clone(),
+                font_size,
+                ..default()
+            },
+            TextLayout::new_with_justify(Justify::Center),
+            TextColor(cl_color.with_alpha(0.9)),
+            Transform::from_translation(Vec3::new(
+                -40.0, legend_y, 1.0,
+            )),
+        ))
+        .id();
+    labels.entities.push(ent);
+
+    let ent = commands
+        .spawn((
+            Text2d::new("CDp"),
+            TextFont {
+                font,
+                font_size,
+                ..default()
+            },
+            TextLayout::new_with_justify(Justify::Center),
+            TextColor(cd_color.with_alpha(0.9)),
+            Transform::from_translation(Vec3::new(40.0, legend_y, 1.0)),
+        ))
+        .id();
+    labels.entities.push(ent);
 }

@@ -180,6 +180,9 @@ pub struct LeftPanelPanelControls;
 pub struct PolarsControls;
 
 #[derive(Component)]
+pub struct FlowAlphaControls;
+
+#[derive(Component)]
 pub struct PanelCountText;
 
 #[derive(Component)]

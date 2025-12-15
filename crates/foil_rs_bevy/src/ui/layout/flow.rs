@@ -16,8 +16,8 @@ use crate::state::FlowSettings;
 
 use super::super::types::NumericField;
 use super::super::types::{
-    FlowToggleKind, InputSlider, PanelSection, PanelSections,
-    SectionContent, SectionToggle,
+    FlowAlphaControls, FlowToggleKind, InputSlider, PanelSection,
+    PanelSections, SectionContent, SectionToggle, VisualMode,
 };
 use super::super::{config, style};
 use super::numeric::spawn_numeric_input;
@@ -26,6 +26,7 @@ pub(super) fn spawn_flow_section(
     panel: &mut ChildSpawnerCommands<'_>,
     asset_server: &AssetServer,
     flow: &FlowSettings,
+    mode: VisualMode,
     sections: &PanelSections,
     theme_mode: super::super::types::UiColorThemeMode,
 ) {
@@ -79,36 +80,54 @@ pub(super) fn spawn_flow_section(
             },
         ))
         .with_children(|flow_panel| {
-            flow_panel.spawn(Text::new("Angle of attack α (deg)"));
-            flow_panel.spawn((
-                slider(
-                    SliderProps {
-                        value: flow.alpha_deg,
-                        min: -10.0,
-                        max: 15.0,
+            flow_panel
+                .spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(6.0),
+                        display: if mode == VisualMode::Polars {
+                            Display::None
+                        } else {
+                            Display::Flex
+                        },
+                        ..default()
                     },
-                    (SliderStep(0.5), SliderPrecision(1)),
-                ),
-                InputSlider,
-                observe(slider_self_update),
-                observe(
-                    |change: On<ValueChange<f32>>,
-                     mut f: ResMut<FlowSettings>| {
-                        f.alpha_deg = change.value;
-                    },
-                ),
-            ));
-            spawn_numeric_input(
-                flow_panel,
-                asset_server,
-                theme_mode,
-                NumericField::AlphaDeg,
-                format!("{:.2}", flow.alpha_deg),
-                -10.0,
-                15.0,
-                2,
-                false,
-            );
+                    FlowAlphaControls,
+                    Name::new("FlowAlphaControls"),
+                ))
+                .with_children(|alpha| {
+                    alpha.spawn(Text::new("Angle of attack α (deg)"));
+                    alpha.spawn((
+                        slider(
+                            SliderProps {
+                                value: flow.alpha_deg,
+                                min: -10.0,
+                                max: 15.0,
+                            },
+                            (SliderStep(0.5), SliderPrecision(1)),
+                        ),
+                        InputSlider,
+                        observe(slider_self_update),
+                        observe(
+                            |change: On<ValueChange<f32>>,
+                             mut f: ResMut<FlowSettings>| {
+                                f.alpha_deg = change.value;
+                            },
+                        ),
+                    ));
+                    spawn_numeric_input(
+                        alpha,
+                        asset_server,
+                        theme_mode,
+                        NumericField::AlphaDeg,
+                        format!("{:.2}", flow.alpha_deg),
+                        -10.0,
+                        15.0,
+                        2,
+                        false,
+                    );
+                });
 
             flow_panel.spawn(Text::new("Reynolds (×10⁶)"));
             flow_panel.spawn((

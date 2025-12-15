@@ -19,13 +19,14 @@ use crate::solvers::{
 use crate::state::{FlowSettings, NacaParams, cl_thin};
 
 use super::types::{
-    ExportPolarsButton, ExportStatus, ExportStatusText, FlowToggleKind,
-    InputModeButton, InputSlider, LeftPanelMainControls,
-    LeftPanelPanelControls, NacaHeading, NumericField, NumericInput,
-    NumericInputFocus, NumericInputRow, NumericInputText,
-    PanelCountText, PanelSections, PolarSweepSettings, PolarsControls,
-    SectionContent, SectionToggle, TableField, ThemeToggleButton,
-    UiColorThemeMode, UiInputMode, ViewButton, VisualMode,
+    ExportPolarsButton, ExportStatus, ExportStatusText,
+    FlowAlphaControls, FlowToggleKind, InputModeButton, InputSlider,
+    LeftPanelMainControls, LeftPanelPanelControls, NacaHeading,
+    NumericField, NumericInput, NumericInputFocus, NumericInputRow,
+    NumericInputText, PanelCountText, PanelSections,
+    PolarSweepSettings, PolarsControls, SectionContent, SectionToggle,
+    TableField, ThemeToggleButton, UiColorThemeMode, UiInputMode,
+    ViewButton, VisualMode,
 };
 use super::{config, feathers_theme, style};
 use std::path::{Path, PathBuf};
@@ -294,6 +295,15 @@ pub fn update_left_panel_visibility(
             Without<LeftPanelPanelControls>,
         ),
     >,
+    mut flow_alpha: Query<
+        &mut Node,
+        (
+            With<FlowAlphaControls>,
+            Without<LeftPanelMainControls>,
+            Without<LeftPanelPanelControls>,
+            Without<PolarsControls>,
+        ),
+    >,
 ) {
     if !mode.is_changed() {
         return;
@@ -317,6 +327,15 @@ pub fn update_left_panel_visibility(
     let show_polars = *mode == VisualMode::Polars;
     for mut node in &mut polars {
         node.display = if show_polars {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+
+    let show_alpha = *mode != VisualMode::Polars;
+    for mut node in &mut flow_alpha {
+        node.display = if show_alpha {
             Display::Flex
         } else {
             Display::None
