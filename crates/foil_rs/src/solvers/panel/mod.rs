@@ -79,7 +79,7 @@ impl PanelSolution {
     }
 }
 
-pub(crate) struct PanelLuSystem {
+pub struct PanelLuSystem {
     panels: Vec<Panel>,
     lu: Vec<f32>,
     pivots: Vec<usize>,
@@ -88,21 +88,15 @@ pub(crate) struct PanelLuSystem {
     lower_dir: Vec2,
 }
 
-#[cfg(any(feature = "bevy", test))]
-pub(crate) struct PanelFlow<'a> {
+pub struct PanelFlow<'a> {
     panels: &'a [Panel],
     sources: Vec<f32>,
     gamma: f32,
     freestream: Vec2,
 }
 
-#[cfg(any(feature = "bevy", test))]
 impl PanelFlow<'_> {
-    pub(crate) fn velocity_body_pg(
-        &self,
-        point: Vec2,
-        mach: f32,
-    ) -> Vec2 {
+    pub fn velocity_body_pg(&self, point: Vec2, mach: f32) -> Vec2 {
         let beta = (1.0 - mach * mach).clamp(0.05, 1.0).sqrt();
         let induced = induced_velocity_from_solution(
             point,
@@ -115,7 +109,7 @@ impl PanelFlow<'_> {
 }
 
 impl PanelLuSystem {
-    pub(crate) fn new(params: &NacaParams) -> Option<Self> {
+    pub fn new(params: &NacaParams) -> Option<Self> {
         let geometry = build_naca_body_geometry(params);
         let panels = build_panels(&geometry);
         if panels.len() < 4 {
@@ -136,11 +130,7 @@ impl PanelLuSystem {
         })
     }
 
-    #[cfg(any(feature = "bevy", test))]
-    pub(crate) fn solve_flow(
-        &self,
-        alpha_deg: f32,
-    ) -> Option<PanelFlow<'_>> {
+    pub fn solve_flow(&self, alpha_deg: f32) -> Option<PanelFlow<'_>> {
         let alpha_rad = alpha_deg.to_radians();
         let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
         let (sources, gamma) = self.solve(freestream)?;
@@ -173,7 +163,7 @@ impl PanelLuSystem {
         Some((sources, gamma))
     }
 
-    pub(crate) fn panel_solution(
+    pub fn panel_solution(
         &self,
         params: &NacaParams,
         alpha_deg: f32,

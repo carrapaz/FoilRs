@@ -147,7 +147,7 @@ fn polar_row(
     }
 }
 
-pub(crate) fn compute_polar_sweep_parallel_with_system(
+pub fn compute_polar_sweep_parallel_with_system(
     params: &NacaParams,
     flow: &FlowSettings,
     alpha_min_deg: f32,

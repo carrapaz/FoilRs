@@ -1,9 +1,6 @@
-#[cfg(feature = "bevy")]
-use bevy::prelude::*;
 use std::f32::consts::PI;
 
 /// Parameters for a NACA 4-digit airfoil.
-#[cfg_attr(feature = "bevy", derive(Resource))]
 #[derive(Clone)]
 pub struct NacaParams {
     /// First digit: maximum camber in % of chord (0–9).
@@ -77,7 +74,6 @@ impl NacaParams {
 }
 
 /// Angle of attack (deg).
-#[cfg_attr(feature = "bevy", derive(Resource))]
 #[derive(Clone)]
 pub struct FlowSettings {
     pub alpha_deg: f32,

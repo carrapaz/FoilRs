@@ -3,15 +3,6 @@
 version = 4
 
 [[package]]
-name = "FoilRs"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "glam",
- "log",
-]
-
-[[package]]
 name = "ab_glyph"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2276,6 +2267,23 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
+
+[[package]]
+name = "foil_rs"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "log",
+]
+
+[[package]]
+name = "foil_rs_bevy"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "foil_rs",
+ "log",
+]
 
 [[package]]
 name = "foldhash"

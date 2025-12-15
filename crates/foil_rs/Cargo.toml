@@ -1,0 +1,10 @@
+[package]
+name = "foil_rs"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+glam = "0.30.9"
+log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
+

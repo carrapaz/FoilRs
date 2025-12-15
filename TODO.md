@@ -1,19 +1,19 @@
 ## TODO
 
 ### Next up (code health + scalability)
-- [ ] Consider splitting into `foil_rs_core` + `foil_rs_bevy` crates for long-term scalability (core solver/lib vs UI/app).
+- [ ] Consider splitting published crates further (e.g. `foil_rs_core` vs `foil_rs_bevy`) if/when the public API surface grows.
 
 ### Completed
+- [x] Split into a Cargo workspace: `foil_rs` (core) + `foil_rs_bevy` (UI/app).
 - [x] Improve headless benchmarking harness (warmup, multi-run stats).
 - [x] (Perf) Make boundary-layer integration allocation-free in sweeps.
 - [x] Unify theming: rely on Feathers theme tokens + `ThemeBackgroundColor`/`ThemeBorderColor` instead of spawning hard-coded colors.
 - [x] Remove UI rebuild-on-theme-toggle (preserve UI state like focus/sections; scale to more widgets).
-- [x] Deduplicate common UI “pill button” spawning patterns in `src/ui/layout/topbar.rs`.
+- [x] Deduplicate common UI “pill button” spawning patterns in `crates/foil_rs_bevy/src/ui/layout/topbar.rs`.
 - [x] Sweep α to generate polars (CL, CDp) with charts and CSV export.
 - [x] Add headless/batch mode for scripted sweeps/CI plus benchmarks for solver performance.
-- [x] Make Bevy optional so `foil_rs` works as a headless library (`--no-default-features`).
-- [x] Add headless examples: `examples/headless.rs`, `examples/bench_headless.rs`, `examples/export_polar_csv.rs`.
-- [x] Move UI-only enums out of `src/state/` (e.g. `VisualMode`, `TableField`) into `src/ui/` so `foil_rs` stays a clean library API.
+- [x] Add headless examples: `crates/foil_rs/examples/headless.rs`, `crates/foil_rs/examples/bench_headless.rs`, `crates/foil_rs/examples/export_polar_csv.rs`.
+- [x] Move UI-only enums out of `state` into `ui` so `foil_rs` stays a clean library API.
 - [x] Introduce a cached/factorized panel-system path so polar sweeps reuse geometry/matrix across α (big perf win).
 - [x] Refactor `compute_polar_sweep` to use deterministic integer steps + `Vec::with_capacity` (avoid float-drift + reallocs).
 - [x] Add optional multi-threaded polar sweeps (no extra deps; uses `std::thread`).

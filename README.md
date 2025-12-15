@@ -80,13 +80,13 @@ cargo run
 
 ### Use as a library (no Bevy)
 
-FoilRs’ solver + geometry code can be used without the Bevy UI by disabling default features:
+FoilRs’ solver + geometry code lives in the `foil_rs` crate (no Bevy dependency):
 
-- In your `Cargo.toml`: `foil_rs = { path = ".../FoilRs", default-features = false }`
+- In your `Cargo.toml`: `foil_rs = { path = ".../FoilRs/crates/foil_rs" }`
 - Or run the included headless example:
 
 ```bash
-cargo run --example headless --no-default-features -- 2412 4.0
+cargo run -p foil_rs --example headless -- 2412 4.0
 ```
 
 ### Benchmark (headless)
@@ -94,7 +94,7 @@ cargo run --example headless --no-default-features -- 2412 4.0
 Quick timing harness (no extra deps), recommended in `--release`:
 
 ```bash
-cargo run --example bench_headless --no-default-features --release -- 2412 4.0
+cargo run -p foil_rs --example bench_headless --release -- 2412 4.0
 ```
 
 Args (all optional): `NACA ALPHA_DEG PANEL_ITERS POLAR_ITERS ALPHA_MIN ALPHA_MAX ALPHA_STEP THREADS RUNS WARMUP_RUNS`
@@ -104,7 +104,7 @@ Args (all optional): `NACA ALPHA_DEG PANEL_ITERS POLAR_ITERS ALPHA_MIN ALPHA_MAX
 Writes an α-sweep CSV to `exports/` (no Bevy required):
 
 ```bash
-cargo run --example export_polar_csv --no-default-features --release -- 2412
+cargo run -p foil_rs --example export_polar_csv --release -- 2412
 ```
 
 Args (all optional): `NACA REYNOLDS MACH VISCOUS FREE_TRANSITION ALPHA_MIN ALPHA_MAX ALPHA_STEP THREADS OUT_PATH`
@@ -125,10 +125,8 @@ Args (all optional): `NACA REYNOLDS MACH VISCOUS FREE_TRANSITION ALPHA_MIN ALPHA
 
 ## Project structure
 
-- `src/ui/` — UI layout + systems (top bar, left panel, input mode, export).
-- `src/views/` — visualization layers (Field/Cp/Polars/Panels).
-- `src/solvers/` — panel solver + boundary-layer estimate + polar sweep helper.
-- `tests/` — sanity tests that catch sign/convention regressions.
+- `crates/foil_rs/` — core solver + geometry + headless examples/tests (no Bevy).
+- `crates/foil_rs_bevy/` — Bevy UI + visualizations and the `FoilRs` app.
 
 ## Roadmap
 

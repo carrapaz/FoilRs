@@ -135,13 +135,13 @@ mod tests {
     use super::*;
 
     fn flow(mach: f32, reynolds: f32, viscous: bool) -> FlowSettings {
-        FlowSettings {
+        FlowSettings(foil_rs::state::FlowSettings {
             alpha_deg: 4.0,
             reynolds,
             mach,
             viscous,
             free_transition: true,
-        }
+        })
     }
 
     #[test]

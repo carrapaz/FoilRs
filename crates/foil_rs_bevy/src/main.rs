@@ -2,7 +2,7 @@ use bevy::feathers::{FeathersPlugins, theme::UiTheme};
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin, WindowResolution};
 
-use foil_rs::{plotter, state, ui, views};
+use foil_rs_bevy::{plotter, state, ui, views};
 use state::{FlowSettings, NacaParams};
 use ui::VisualMode;
 

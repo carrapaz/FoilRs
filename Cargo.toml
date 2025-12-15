@@ -1,26 +1,7 @@
-[package]
-name = "FoilRs"
-version = "0.1.0"
-edition = "2024"
-
-[lib]
-name = "foil_rs"
-path = "src/lib.rs"
-
-[features]
-default = ["bevy"]
-bevy = ["dep:bevy"]
-
-[[bin]]
-name = "FoilRs"
-path = "src/main.rs"
-required-features = ["bevy"]
-
-[dependencies]
-bevy = { version = "0.17.3", optional = true, features = ["dynamic_linking","experimental_bevy_feathers"] }
-glam = "0.30.9"
-
-log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
+[workspace]
+resolver = "3"
+members = ["crates/foil_rs", "crates/foil_rs_bevy"]
+default-members = ["crates/foil_rs_bevy"]
 
 
 # Enable a small amount of optimization in the dev profile.
