@@ -82,7 +82,8 @@ cargo run
 
 FoilRs’ solver + geometry code lives in the `foil_rs` crate (no Bevy dependency):
 
-- In your `Cargo.toml`: `foil_rs = { path = ".../FoilRs/crates/foil_rs" }`
+- From crates.io: `foil_rs = "0.1"`
+- Or for local development: `foil_rs = { path = ".../FoilRs/crates/foil_rs" }`
 - Or run the included headless example:
 
 ```bash
