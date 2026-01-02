@@ -1,0 +1,73 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run `cargo publish --dry-run` only"
+        type: choice
+        options: ["true", "false"]
+        default: "true"
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve publish mode
+        id: mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+              echo "args=--dry-run" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+          fi
+          echo "args=" >> "${GITHUB_OUTPUT}"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Ensure crates.io token configured
+        if: steps.mode.outputs.args == ''
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CRATES_IO_TOKEN}" ]]; then
+            echo "Missing secret CRATES_IO_TOKEN"
+            exit 1
+          fi
+
+      - name: Publish foil_rs
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish -p foil_rs --locked ${{ steps.mode.outputs.args }}
+
+      - name: Publish foil_rs_bevy (retry for index propagation)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          set -euo pipefail
+          for i in {1..10}; do
+            if cargo publish -p foil_rs_bevy --locked ${{ steps.mode.outputs.args }}; then
+              exit 0
+            fi
+            echo "publish failed (attempt $i/10); waiting for crates.io index propagation..."
+            sleep 30
+          done
+          echo "failed to publish foil_rs_bevy after retries"
+          exit 1
