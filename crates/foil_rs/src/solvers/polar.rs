@@ -61,6 +61,7 @@ pub fn compute_polar_sweep(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn compute_polar_sweep_parallel_with_system_mode(
     params: &NacaParams,
     flow: &FlowSettings,
@@ -162,7 +163,7 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
         };
     }
 
-    let chunk_size = (alphas.len() + thread_count - 1) / thread_count;
+    let chunk_size = alphas.len().div_ceil(thread_count);
     let mut chunks: Vec<(Vec<PolarRow>, bool)> =
         Vec::with_capacity(thread_count);
 
@@ -409,7 +410,7 @@ pub fn compute_polar_sweep_parallel_with_system(
         return rows;
     }
 
-    let chunk_size = (alphas.len() + thread_count - 1) / thread_count;
+    let chunk_size = alphas.len().div_ceil(thread_count);
     let mut chunks: Vec<Vec<PolarRow>> =
         Vec::with_capacity(thread_count);
 

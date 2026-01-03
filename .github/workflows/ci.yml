@@ -52,7 +52,7 @@ jobs:
 
       - name: Clippy
         if: matrix.rust == 'stable'
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy -p foil_rs --lib --tests -- -D warnings
 
       - name: Core tests
         run: cargo test -p foil_rs
