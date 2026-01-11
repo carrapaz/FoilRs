@@ -70,9 +70,8 @@ fn odd_even_panel_counts_should_match() {
     let mut odd = even.clone();
     odd.num_points = 161;
 
-    let cl_even = compute_panel_solution(&even, 4.0)
-        .cl()
-        .unwrap_or(f32::NAN);
+    let cl_even =
+        compute_panel_solution(&even, 4.0).cl().unwrap_or(f32::NAN);
     let cl_odd =
         compute_panel_solution(&odd, 4.0).cl().unwrap_or(f32::NAN);
     let diff = (cl_even - cl_odd).abs();

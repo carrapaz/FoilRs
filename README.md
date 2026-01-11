@@ -134,6 +134,14 @@ Args (all optional): `NACA RE_MILLIONS_LIST MACH_LIST VISCOUS FREE_TRANSITION AL
   - Switch to **Panels** view and reduce **Points per surface** (fewer panels).
   - Increase α step size (planned; currently fixed).
 
+## Development
+
+Enable the repo-local Git hook to auto-format on commit:
+
+```bash
+./scripts/setup-git-hooks.sh
+```
+
 ## Project structure
 
 - `crates/foil_rs/` — core solver + geometry + headless examples/tests (no Bevy).
