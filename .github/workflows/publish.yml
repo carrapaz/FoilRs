@@ -74,15 +74,33 @@ jobs:
       - name: Publish foil_rs
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: cargo publish -p foil_rs --locked ${{ steps.mode.outputs.args }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args="${{ steps.mode.outputs.args }}"
+          log="$(mktemp)"
+          if cargo publish -p foil_rs --locked ${args} 2>&1 | tee "${log}"; then
+            exit 0
+          fi
+          if grep -q "already exists on crates.io index" "${log}"; then
+            echo "foil_rs already published; continuing."
+            exit 0
+          fi
+          exit 1
 
       - name: Publish foil_rs_bevy (retry for index propagation)
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
         run: |
           set -euo pipefail
+          args="${{ steps.mode.outputs.args }}"
           for i in {1..10}; do
-            if cargo publish -p foil_rs_bevy --locked ${{ steps.mode.outputs.args }}; then
+            log="$(mktemp)"
+            if cargo publish -p foil_rs_bevy --locked ${args} 2>&1 | tee "${log}"; then
+              exit 0
+            fi
+            if grep -q "already exists on crates.io index" "${log}"; then
+              echo "foil_rs_bevy already published; done."
               exit 0
             fi
             echo "publish failed (attempt $i/10); waiting for crates.io index propagation..."
