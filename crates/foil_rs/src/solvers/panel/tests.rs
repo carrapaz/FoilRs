@@ -28,7 +28,6 @@ fn cl_scales_with_alpha() {
 }
 
 #[test]
-#[ignore]
 fn cl_snapshot_alpha0_print() {
     let params = NacaParams::default();
     let sol = compute_panel_solution(&params, 0.0);
@@ -61,5 +60,28 @@ fn pg_scaling_increases_induced_velocity_with_mach() {
         "expected induced velocity to increase with Mach: |i0|={}, |i1|={}",
         induced0.length(),
         induced1.length()
+    );
+}
+
+#[test]
+fn odd_even_panel_counts_should_match() {
+    let mut even = NacaParams::default();
+    even.num_points = 160;
+    let mut odd = even.clone();
+    odd.num_points = 161;
+
+    let cl_even = compute_panel_solution(&even, 4.0)
+        .cl()
+        .unwrap_or(f32::NAN);
+    let cl_odd =
+        compute_panel_solution(&odd, 4.0).cl().unwrap_or(f32::NAN);
+    let diff = (cl_even - cl_odd).abs();
+
+    assert!(
+        diff < 0.1,
+        "odd/even panel counts diverged: cl_even={}, cl_odd={}, diff={}",
+        cl_even,
+        cl_odd,
+        diff
     );
 }

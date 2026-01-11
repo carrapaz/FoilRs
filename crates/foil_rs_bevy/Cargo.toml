@@ -1,6 +1,6 @@
 [package]
 name = "foil_rs_bevy"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "Bevy UI frontend for FoilRs (interactive airfoil playground)."
@@ -20,5 +20,5 @@ dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
 bevy = { version = "0.17.3", features = ["experimental_bevy_feathers"] }
-foil_rs = { version = "0.1.0", path = "../foil_rs" }
+foil_rs = { version = "0.1.1", path = "../foil_rs" }
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }

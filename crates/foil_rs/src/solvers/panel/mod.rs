@@ -15,6 +15,11 @@ use panels::{Panel, build_panels};
 const SURFACE_SAMPLE_EPS: f32 = 1e-4;
 const COLLOCATION_OFFSET: f32 = 1e-4;
 
+fn effective_num_points(params: &NacaParams) -> usize {
+    let n = params.num_points.max(32);
+    if n % 2 == 0 { n } else { n + 1 }
+}
+
 /// Result of our pseudo-panel solution.
 pub struct PanelSolution {
     /// x / c for each sample, 0..1.
@@ -162,7 +167,9 @@ impl PanelFlow<'_> {
 
 impl PanelLuSystem {
     pub fn new(params: &NacaParams) -> Option<Self> {
-        let geometry = build_naca_body_geometry_sharp_te(params);
+        let mut local = params.clone();
+        local.num_points = effective_num_points(params);
+        let geometry = build_naca_body_geometry_sharp_te(&local);
         let panels = build_panels(&geometry);
         if panels.len() < 4 {
             return None;
@@ -237,8 +244,10 @@ impl PanelLuSystem {
             };
         };
 
+        let mut local = params.clone();
+        local.num_points = effective_num_points(params);
         build_panel_solution_from_strengths(
-            params,
+            &local,
             alpha_deg,
             freestream,
             &self.panels,
@@ -292,7 +301,9 @@ pub fn compute_panel_solution(
     // space, so in body coordinates the freestream rotates with alpha.
     let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
 
-    let geometry = build_naca_body_geometry_sharp_te(params);
+    let mut local = params.clone();
+    local.num_points = effective_num_points(params);
+    let geometry = build_naca_body_geometry_sharp_te(&local);
     let panels = build_panels(&geometry);
 
     if panels.len() < 4 {
@@ -328,7 +339,7 @@ pub fn compute_panel_solution(
     let gamma = strengths[n_panels];
     let source_strengths = strengths[..n_panels].to_vec();
     build_panel_solution_from_strengths(
-        params,
+        &local,
         alpha_deg,
         freestream,
         &panels,
