@@ -17,7 +17,7 @@ const COLLOCATION_OFFSET: f32 = 1e-4;
 
 fn effective_num_points(params: &NacaParams) -> usize {
     let n = params.num_points.max(32);
-    if n % 2 == 0 { n } else { n + 1 }
+    if n.is_multiple_of(2) { n } else { n + 1 }
 }
 
 /// Result of our pseudo-panel solution.

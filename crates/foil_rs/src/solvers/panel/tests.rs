@@ -65,8 +65,10 @@ fn pg_scaling_increases_induced_velocity_with_mach() {
 
 #[test]
 fn odd_even_panel_counts_should_match() {
-    let mut even = NacaParams::default();
-    even.num_points = 160;
+    let even = NacaParams {
+        num_points: 160,
+        ..Default::default()
+    };
     let mut odd = even.clone();
     odd.num_points = 161;
 

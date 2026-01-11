@@ -142,6 +142,21 @@ Enable the repo-local Git hook to auto-format on commit:
 ./scripts/setup-git-hooks.sh
 ```
 
+### Release checklist
+
+Run the local checks before pushing a tag:
+
+```bash
+./scripts/release-check.sh
+./scripts/release-check.sh --publish-dry-run
+```
+
+To match the binary release workflow locally:
+
+```bash
+./scripts/release-check.sh --release-binary
+```
+
 ## Project structure
 
 - `crates/foil_rs/` — core solver + geometry + headless examples/tests (no Bevy).
