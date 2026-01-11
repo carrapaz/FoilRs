@@ -151,6 +151,8 @@ Run the local checks before pushing a tag:
 ./scripts/release-check.sh --publish-dry-run
 ```
 
+Note: the publish dry-run only validates `foil_rs` locally; `foil_rs_bevy` depends on that version being on crates.io.
+
 To match the binary release workflow locally:
 
 ```bash

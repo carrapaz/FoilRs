@@ -57,6 +57,5 @@ fi
 if [[ "${publish_dry_run}" == "true" ]]; then
   echo "==> Cargo publish dry-run (foil_rs)"
   cargo publish -p foil_rs --locked --dry-run
-  echo "==> Cargo package (foil_rs_bevy)"
-  cargo package -p foil_rs_bevy --locked
+  echo "==> Skipping foil_rs_bevy dry-run (requires foil_rs to be published first)"
 fi
