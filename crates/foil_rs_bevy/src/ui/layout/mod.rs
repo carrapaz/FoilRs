@@ -105,10 +105,10 @@ pub(super) fn spawn_ui_root(
                         ),
                         row_gap: Val::Px(14.0),
                         border: UiRect::all(Val::Px(1.0)),
+                        border_radius: BorderRadius::all(Val::Px(14.0)),
                         ..default()
                     },
                     ThemeBorderColor(tokens::CHECKBOX_BORDER),
-                    BorderRadius::all(Val::Px(14.0)),
                     ThemeBackgroundColor(tokens::WINDOW_BG),
                     ModePanel,
                 ))

@@ -47,10 +47,12 @@ pub(super) fn spawn_numeric_input(
                     width: Val::Px(92.0),
                     padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
                     border: UiRect::all(Val::Px(1.0)),
+                    border_radius: BorderRadius::all(Val::Px(
+                        config::BUTTON_RADIUS,
+                    )),
                     ..default()
                 },
                 ThemeBorderColor(tokens::CHECKBOX_BORDER),
-                BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
                 ThemeBackgroundColor(tokens::BUTTON_BG),
                 ThemeFontColor(tokens::TEXT_MAIN),
                 Button,

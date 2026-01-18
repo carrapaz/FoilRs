@@ -20,10 +20,10 @@ pub(super) fn spawn_summary_panel(root: &mut ChildSpawnerCommands<'_>) {
             row_gap: Val::Px(10.0),
             padding: UiRect::all(Val::Px(12.0)),
             border: UiRect::all(Val::Px(1.0)),
+            border_radius: BorderRadius::all(Val::Px(12.0)),
             ..default()
         },
         ThemeBorderColor(tokens::CHECKBOX_BORDER),
-        BorderRadius::all(Val::Px(12.0)),
         ThemeBackgroundColor(tokens::WINDOW_BG),
     ))
     .with_children(|panel| {
@@ -35,10 +35,10 @@ pub(super) fn spawn_summary_panel(root: &mut ChildSpawnerCommands<'_>) {
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(4.0),
                     padding: UiRect::all(Val::Px(10.0)),
+                    border_radius: BorderRadius::all(Val::Px(10.0)),
                     ..default()
                 },
                 ThemeBackgroundColor(tokens::BUTTON_BG),
-                BorderRadius::all(Val::Px(10.0)),
             ))
             .with_children(spawn_summary_table);
     });

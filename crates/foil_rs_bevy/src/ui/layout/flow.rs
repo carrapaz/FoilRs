@@ -38,6 +38,9 @@ pub(super) fn spawn_flow_section(
                 padding: UiRect::axes(Val::Px(6.0), Val::Px(4.0)),
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(Val::Px(
+                    config::BUTTON_RADIUS,
+                )),
                 ..default()
             },
             ThemeBackgroundColor(if flow_open {
@@ -45,7 +48,6 @@ pub(super) fn spawn_flow_section(
             } else {
                 tokens::BUTTON_BG
             }),
-            BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
             ThemeFontColor(tokens::TEXT_MAIN),
             Button,
             SectionToggle {
@@ -203,6 +205,9 @@ pub(super) fn spawn_flow_section(
                         ),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
+                        border_radius: BorderRadius::all(Val::Px(
+                            config::BUTTON_RADIUS,
+                        )),
                         ..default()
                     },
                     ThemeBackgroundColor(if flow.viscous {
@@ -210,7 +215,6 @@ pub(super) fn spawn_flow_section(
                     } else {
                         tokens::BUTTON_BG
                     }),
-                    BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
                     ThemeFontColor(if flow.viscous {
                         tokens::BUTTON_PRIMARY_TEXT
                     } else {
@@ -243,6 +247,9 @@ pub(super) fn spawn_flow_section(
                         ),
                         justify_content: JustifyContent::Center,
                         align_items: AlignItems::Center,
+                        border_radius: BorderRadius::all(Val::Px(
+                            config::BUTTON_RADIUS,
+                        )),
                         ..default()
                     },
                     ThemeBackgroundColor(if flow.free_transition {
@@ -250,7 +257,6 @@ pub(super) fn spawn_flow_section(
                     } else {
                         tokens::BUTTON_BG
                     }),
-                    BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
                     ThemeFontColor(if flow.free_transition {
                         tokens::BUTTON_PRIMARY_TEXT
                     } else {

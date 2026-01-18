@@ -37,6 +37,9 @@ pub(super) fn spawn_geometry_section(
                 padding: UiRect::axes(Val::Px(6.0), Val::Px(4.0)),
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(Val::Px(
+                    config::BUTTON_RADIUS,
+                )),
                 ..default()
             },
             ThemeBackgroundColor(if geometry_open {
@@ -44,7 +47,6 @@ pub(super) fn spawn_geometry_section(
             } else {
                 tokens::BUTTON_BG
             }),
-            BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
             ThemeFontColor(tokens::TEXT_MAIN),
             Button,
             SectionToggle {

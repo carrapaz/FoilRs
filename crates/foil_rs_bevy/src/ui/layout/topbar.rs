@@ -243,10 +243,10 @@ fn spawn_pill_button<B: Bundle>(
             Node {
                 padding: UiRect::axes(Val::Px(12.0), Val::Px(8.0)),
                 border: UiRect::all(Val::Px(1.0)),
+                border_radius: BorderRadius::all(Val::Px(999.0)),
                 ..default()
             },
             ThemeBorderColor(tokens::CHECKBOX_BORDER),
-            BorderRadius::all(Val::Px(999.0)),
             ThemeBackgroundColor(bg),
             ThemeFontColor(fg),
             Button,

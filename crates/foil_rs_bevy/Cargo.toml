@@ -19,6 +19,6 @@ default = []
 dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
-bevy = { version = "0.17.3", features = ["experimental_bevy_feathers"] }
+bevy = { version = "0.18.0", features = ["experimental_bevy_feathers"] }
 foil_rs = { version = "0.1.3", path = "../foil_rs" }
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }

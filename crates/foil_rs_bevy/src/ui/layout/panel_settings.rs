@@ -72,10 +72,12 @@ pub(super) fn spawn_panel_settings(
                 Node {
                     width: Val::Percent(100.0),
                     padding: UiRect::axes(Val::Px(8.0), Val::Px(6.0)),
+                    border_radius: BorderRadius::all(Val::Px(
+                        config::BUTTON_RADIUS,
+                    )),
                     ..default()
                 },
                 ThemeBackgroundColor(tokens::BUTTON_BG),
-                BorderRadius::all(Val::Px(config::BUTTON_RADIUS)),
                 ThemeFontColor(tokens::TEXT_MAIN),
             ))
             .with_children(|note| {
