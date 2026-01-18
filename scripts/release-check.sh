@@ -15,6 +15,7 @@ EOF
 publish_dry_run=false
 release_binary=false
 allow_dirty=false
+publish_extra_args=()
 
 for arg in "$@"; do
   case "${arg}" in
@@ -35,6 +36,8 @@ if [[ "${allow_dirty}" == "false" ]]; then
     echo "Working tree is not clean. Commit or stash before release checks." >&2
     exit 1
   fi
+else
+  publish_extra_args+=(--allow-dirty)
 fi
 
 echo "==> Formatting"
@@ -56,6 +59,6 @@ fi
 
 if [[ "${publish_dry_run}" == "true" ]]; then
   echo "==> Cargo publish dry-run (foil_rs)"
-  cargo publish -p foil_rs --locked --dry-run
+  cargo publish -p foil_rs --locked --dry-run "${publish_extra_args[@]}"
   echo "==> Skipping foil_rs_bevy dry-run (requires foil_rs to be published first)"
 fi
