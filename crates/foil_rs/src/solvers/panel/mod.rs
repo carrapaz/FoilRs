@@ -6,6 +6,7 @@ use crate::state::{FlowSettings, NacaParams};
 use super::boundary_layer::{self, BoundaryLayerInputs};
 
 mod geometry;
+mod linear;
 mod panels;
 
 use geometry::{
@@ -182,11 +183,10 @@ pub struct PanelFlow<'a> {
 impl PanelFlow<'_> {
     pub fn velocity_body_pg(&self, point: Vec2, mach: f32) -> Vec2 {
         let beta = (1.0 - mach * mach).clamp(0.05, 1.0).sqrt();
-        let induced = induced_velocity_from_solution(
+        let induced = linear::induced_velocity(
             point,
             self.panels,
-            &self.sources,
-            self.gamma,
+            &self.sources, // stores full solution vector
         );
         self.freestream + induced / beta
     }
@@ -202,17 +202,15 @@ impl PanelLuSystem {
             return None;
         }
 
-        let (
-            matrix,
-            tan_infl,
-            vort_tan_self,
-            size,
-            upper_dir,
-            lower_dir,
-        ) = assemble_matrix(&panels);
+        // Source + linear-vortex (Morino coupling). (N+1)×(N+1).
+        let (matrix, tan_infl, size) = linear::assemble(&panels);
         let (lu, pivots) = lu_factorize(&matrix, size)?;
 
-        let mut sys = Self {
+        let (upper_idx, lower_idx) = kutta_te_panel_indices(&panels);
+        let upper_dir = panels[upper_idx].tangent;
+        let lower_dir = -panels[lower_idx].tangent;
+
+        Some(Self {
             panels,
             lu,
             pivots,
@@ -220,43 +218,19 @@ impl PanelLuSystem {
             upper_dir,
             lower_dir,
             tan_infl,
-            vort_tan_self,
-            cl_0_correction: 0.0,
-        };
-
-        // Compute CL_0 correction: the panel method under-predicts
-        // the camber-induced CL_0 due to collocation-offset bias.
-        // The thin-airfoil theory gives an accurate CL_0 reference.
-        if local.m() > 1e-4 {
-            let alpha_0l_theory = thin_airfoil_zero_lift_alpha(&local);
-            // CL_0 from thin-airfoil: CL_0 = cl_alpha_2D * |alpha_0L|
-            // where cl_alpha_2D ≈ 2π (exact for thin airfoils).
-            let cl_0_theory = 2.0 * PI * alpha_0l_theory.abs();
-            // CL_0 from the panel solver at alpha=0:
-            let freestream_0 = Vec2::new(1.0, 0.0);
-            let cl_0_panel = if let Some((src, gam)) =
-                sys.solve(freestream_0)
-            {
-                let vt =
-                    sys.tangential_velocities(&src, gam, freestream_0);
-                surface_cp_from_panels(&sys.panels, &vt, &local).cl
-            } else {
-                0.0
-            };
-            sys.cl_0_correction = cl_0_theory - cl_0_panel;
-        }
-
-        Some(sys)
+            vort_tan_self: Vec::new(),
+            cl_0_correction: 0.0, // not needed — linear panels are self-consistent
+        })
     }
 
     pub fn solve_flow(&self, alpha_deg: f32) -> Option<PanelFlow<'_>> {
         let alpha_rad = alpha_deg.to_radians();
         let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
-        let (sources, gamma) = self.solve(freestream)?;
+        let (node_gammas, _) = self.solve(freestream)?;
         Some(PanelFlow {
             panels: &self.panels,
-            sources,
-            gamma,
+            sources: node_gammas, // stores node_gammas for field viz
+            gamma: 0.0,
             freestream,
         })
     }
@@ -278,79 +252,35 @@ impl PanelLuSystem {
         freestream: Vec2,
         transpiration: Option<&[f32]>,
     ) -> Option<(Vec<f32>, f32)> {
-        let mut rhs = assemble_rhs(
-            &self.panels,
-            freestream,
-            self.upper_dir,
-            self.lower_dir,
-        );
-        // Add transpiration (displacement-thickness outflow) to the
-        // normal-velocity boundary condition.
+        let mut rhs = linear::assemble_rhs(&self.panels, freestream);
         if let Some(vn) = transpiration {
             let n = self.panels.len().min(vn.len());
             for i in 0..n {
                 rhs[i] += vn[i];
             }
         }
-        let strengths =
+        let solution =
             lu_solve(&self.lu, &self.pivots, &rhs, self.size)?;
-        if strengths.len() != self.size {
+        if solution.len() != self.size {
             return None;
         }
-        let n_panels = self.panels.len();
-        let gamma = strengths[n_panels];
-        let sources = strengths[..n_panels].to_vec();
-        Some((sources, gamma))
+        // Return full solution vector (sources + node_gammas).
+        Some((solution, 0.0))
     }
 
-    /// Recover tangential velocity at each panel surface from the solved
-    /// source/vortex strengths.
-    ///
-    /// Uses the cached tangent influence matrix with **analytic
-    /// self-influence correction**.  For a constant-strength panel, the
-    /// tangential velocity at its own midpoint from its own source/vortex
-    /// is exactly **zero** by symmetry (the two halves of the panel
-    /// induce equal and opposite tangential velocities at the center).
-    /// The cached coefficients are evaluated at the collocation offset
-    /// point where the self-influence is non-zero — this introduces a
-    /// systematic bias that grows with camber.  The correction zeros
-    /// out the self-influence diagonal.
-    /// Recover tangential velocity at each panel surface from the solved
-    /// source/vortex strengths.
-    ///
-    /// Uses the cached tangent influence matrix with a vortex
-    /// self-influence correction.
-    ///
-    /// **Source panels:** V_t is continuous across the panel surface —
-    /// the collocation-offset value equals the surface value.  No
-    /// correction needed.
-    ///
-    /// **Vortex sheet:** V_t has a jump of γ across the surface.  The
-    /// collocation point is on the outside (positive-normal side), so
-    /// V_t(colloc) = V_t(surface) + γ/2.  The surface value is
-    /// V_t(surface) = V_t(colloc) - γ/2.  We apply this correction
-    /// to the vortex self-influence only.
+    /// V_t at each panel midpoint from the full solution vector.
     fn tangential_velocities(
         &self,
-        sources: &[f32],
-        gamma: f32,
+        node_gammas: &[f32],
+        _unused: f32,
         freestream: Vec2,
     ) -> Vec<f32> {
-        let n = self.panels.len();
-        let size = self.size;
-        let mut vt = Vec::with_capacity(n);
-        for i in 0..n {
-            let mut v_induced_t = 0.0;
-            // Source: no correction needed (V_t continuous).
-            for (j, &sigma) in sources.iter().enumerate() {
-                v_induced_t += self.tan_infl[i * size + j] * sigma;
-            }
-            v_induced_t += self.tan_infl[i * size + n] * gamma;
-
-            let v_freestream_t = freestream.dot(self.panels[i].tangent);
-            vt.push(v_freestream_t + v_induced_t);
-        }
-        vt
+        linear::tangential_velocities(
+            &self.panels,
+            &self.tan_infl,
+            node_gammas,
+            freestream,
+        )
     }
 
     pub fn panel_solution(
@@ -361,7 +291,7 @@ impl PanelLuSystem {
         let alpha_rad = alpha_deg.to_radians();
         let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
 
-        let Some((sources, gamma)) = self.solve(freestream) else {
+        let Some((node_gammas, _)) = self.solve(freestream) else {
             let (cl, cm_c4, _) =
                 approx_section_coeffs(params, alpha_deg);
             return PanelSolution {
@@ -375,62 +305,89 @@ impl PanelLuSystem {
             };
         };
 
-        // Recover tangential velocity at each panel from the cached
-        // tangent influence matrix — O(N²) multiplies, zero transcendentals.
+        // V_t at each panel midpoint — smooth, no off-surface sampling.
         let vt =
-            self.tangential_velocities(&sources, gamma, freestream);
+            self.tangential_velocities(&node_gammas, 0.0, freestream);
 
-        // Build Cp on the panel surface from V_t and integrate for
-        // CL and CM.  Uses panel midpoint Cp (no off-surface sampling
-        // singularity) + thin-airfoil CL_0 correction for cambered
-        // airfoils.
-        let scp = surface_cp_from_panels(&self.panels, &vt, params);
-        let scp = SurfaceCpResult {
-            cl: scp.cl + self.cl_0_correction,
-            cm_c4: scp.cm_c4,
-        };
+        // --- Everything from V_t ---
+        let n = self.panels.len();
+        let le_idx = self
+            .panels
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| a.mid.x.total_cmp(&b.mid.x))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
 
-        let mut local = params.clone();
-        local.num_points = effective_num_points(params);
+        // Split panels into upper/lower by LE, build Cp from V_t.
+        // The Morino formulation may swap the convention relative to
+        // the old constant-strength method. Determine empirically:
+        // geometry 0..le_idx = lower surface (TE→LE), le_idx+1..n = upper.
+        let mut lower_pts: Vec<(f32, f32)> = (0..=le_idx)
+            .map(|i| (self.panels[i].mid.x, 1.0 - vt[i] * vt[i]))
+            .collect();
+        lower_pts.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-        // Off-surface Cp sampling is still used for BL and visualization.
-        let cp_sol = build_cp_samples(
-            &local,
-            freestream,
-            &self.panels,
-            &sources,
-            gamma,
-        );
+        let mut upper_pts: Vec<(f32, f32)> = (le_idx + 1..n)
+            .map(|i| (self.panels[i].mid.x, 1.0 - vt[i] * vt[i]))
+            .collect();
+        upper_pts.sort_by(|a, b| a.0.total_cmp(&b.0));
 
+        // Interpolate to cosine-spaced x stations for display and BL.
+        let m = params.m();
+        let p = params.p();
+        let t = params.t();
+        let sample_n = (params.num_points / 2).max(32);
+        let mut xs = Vec::with_capacity(sample_n);
+        let mut cp_u = Vec::with_capacity(sample_n);
+        let mut cp_l = Vec::with_capacity(sample_n);
+        let mut upper_coords = Vec::with_capacity(sample_n);
+        let mut lower_coords = Vec::with_capacity(sample_n);
+
+        for k in 0..sample_n {
+            let beta = k as f32 / (sample_n - 1) as f32;
+            let x_c = 0.5 * (1.0 - (PI * beta).cos());
+            let thickness = thickness_distribution(t, x_c);
+            let camber = camber_line(m, p, x_c);
+            let slope = camber_slope(m, p, x_c);
+            let theta = slope.atan();
+
+            xs.push(x_c);
+            cp_u.push(interp_cp(&upper_pts, x_c));
+            cp_l.push(interp_cp(&lower_pts, x_c));
+            upper_coords.push(Vec2::new(
+                x_c + thickness * theta.sin(),
+                camber - thickness * theta.cos(),
+            ));
+            lower_coords.push(Vec2::new(
+                x_c - thickness * theta.sin(),
+                camber + thickness * theta.cos(),
+            ));
+        }
+
+        // CL and CM from the V_t-derived Cp distribution.
+        let cl = integrate_cl_from_cp(&xs, &cp_u, &cp_l).unwrap_or(0.0);
+        let cm =
+            integrate_cm_c4_from_cp(&xs, &cp_u, &cp_l).unwrap_or(0.0);
         let (cl_approx, cm_approx, _) =
             approx_section_coeffs(params, alpha_deg);
-        // CM: use thin-airfoil theory for cambered profiles (exact for
-        // the zero-alpha pitching moment, ~1% accuracy).  The panel Cp
-        // integration has LE noise that creates alpha-dependent CM
-        // artifacts for cambered airfoils.  For symmetric profiles, Cp
-        // integration is used (it's accurate and captures alpha effects).
-        let cm = if params.m() > 1e-4 {
-            thin_airfoil_cm_c4(params)
-        } else {
-            let cm_cp = integrate_cm_c4_from_cp(
-                &cp_sol.x,
-                &cp_sol.cp_upper,
-                &cp_sol.cp_lower,
-            );
-            cm_cp.unwrap_or(cm_approx)
-        };
+
         PanelSolution {
-            x: cp_sol.x,
-            cp_upper: cp_sol.cp_upper,
-            cp_lower: cp_sol.cp_lower,
-            upper_coords: cp_sol.upper_coords,
-            lower_coords: cp_sol.lower_coords,
-            cl_cached: Some(if scp.cl.is_finite() {
-                scp.cl
+            x: xs,
+            cp_upper: cp_u,
+            cp_lower: cp_l,
+            upper_coords,
+            lower_coords,
+            cl_cached: Some(if cl.is_finite() {
+                cl
             } else {
                 cl_approx
             }),
-            cm_c4_cached: Some(cm),
+            cm_c4_cached: Some(if cm.is_finite() {
+                cm
+            } else {
+                cm_approx
+            }),
         }
     }
 
@@ -774,10 +731,13 @@ pub fn compute_panel_solution(
         };
     }
 
-    let system = assemble_system(&panels, freestream);
-    let strengths = solve_linear_system(system);
+    // Single-shot: assemble + solve + build solution.
+    let (matrix, tan_infl, size) = linear::assemble(&panels);
+    let rhs = linear::assemble_rhs(&panels, freestream);
+    let system = LinearSystem { matrix, rhs, size };
+    let solution = solve_linear_system(system);
 
-    if strengths.len() != panels.len() + 1 {
+    if solution.len() != panels.len() + 1 {
         let (cl, cm_c4, _) = approx_section_coeffs(params, alpha_deg);
         return PanelSolution {
             x: Vec::new(),
@@ -790,17 +750,74 @@ pub fn compute_panel_solution(
         };
     }
 
-    let n_panels = panels.len();
-    let gamma = strengths[n_panels];
-    let source_strengths = strengths[..n_panels].to_vec();
-    build_panel_solution_from_strengths(
-        &local,
-        alpha_deg,
-        freestream,
-        &panels,
-        &source_strengths,
-        gamma,
-    )
+    // V_t from node gammas.
+    let vt = linear::tangential_velocities(
+        &panels, &tan_infl, &solution, freestream,
+    );
+
+    // Build Cp from V_t and integrate for CL/CM.
+    let n = panels.len();
+    let le_idx = panels
+        .iter()
+        .enumerate()
+        .min_by(|(_, a), (_, b)| a.mid.x.total_cmp(&b.mid.x))
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+
+    let mut lower_pts: Vec<(f32, f32)> = (0..=le_idx)
+        .map(|i| (panels[i].mid.x, 1.0 - vt[i] * vt[i]))
+        .collect();
+    lower_pts.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut upper_pts: Vec<(f32, f32)> = (le_idx + 1..n)
+        .map(|i| (panels[i].mid.x, 1.0 - vt[i] * vt[i]))
+        .collect();
+    upper_pts.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+    let m = local.m();
+    let p = local.p();
+    let t = local.t();
+    let sample_n = (local.num_points / 2).max(32);
+    let mut xs = Vec::with_capacity(sample_n);
+    let mut cp_u = Vec::with_capacity(sample_n);
+    let mut cp_l = Vec::with_capacity(sample_n);
+    let mut upper_coords = Vec::with_capacity(sample_n);
+    let mut lower_coords = Vec::with_capacity(sample_n);
+
+    for k in 0..sample_n {
+        let beta = k as f32 / (sample_n - 1) as f32;
+        let x_c = 0.5 * (1.0 - (PI * beta).cos());
+        let thickness = thickness_distribution(t, x_c);
+        let camber = camber_line(m, p, x_c);
+        let slope = camber_slope(m, p, x_c);
+        let theta = slope.atan();
+
+        xs.push(x_c);
+        cp_u.push(interp_cp(&upper_pts, x_c));
+        cp_l.push(interp_cp(&lower_pts, x_c));
+        upper_coords.push(Vec2::new(
+            x_c + thickness * theta.sin(),
+            camber - thickness * theta.cos(),
+        ));
+        lower_coords.push(Vec2::new(
+            x_c - thickness * theta.sin(),
+            camber + thickness * theta.cos(),
+        ));
+    }
+
+    let cl = integrate_cl_from_cp(&xs, &cp_u, &cp_l).unwrap_or(0.0);
+    let cm = integrate_cm_c4_from_cp(&xs, &cp_u, &cp_l).unwrap_or(0.0);
+    let (cl_approx, cm_approx, _) =
+        approx_section_coeffs(params, alpha_deg);
+
+    PanelSolution {
+        x: xs,
+        cp_upper: cp_u,
+        cp_lower: cp_l,
+        upper_coords,
+        lower_coords,
+        cl_cached: Some(if cl.is_finite() { cl } else { cl_approx }),
+        cm_c4_cached: Some(if cm.is_finite() { cm } else { cm_approx }),
+    }
 }
 
 /// Quick analytic fallback (old toy model) used for visualization when the
