@@ -13,6 +13,7 @@ pub use glam::Vec2;
 /// Max error: ~1.5e-4 radians (~0.009°) across the full domain.
 /// ~3-4x faster than libm atan2f on ARM and x86.
 #[inline(always)]
+#[allow(clippy::excessive_precision)] // minimax coefficients — every digit matters
 pub fn fast_atan2(y: f32, x: f32) -> f32 {
     // Handle zero case.
     if x == 0.0 && y == 0.0 {
@@ -34,10 +35,10 @@ pub fn fast_atan2(y: f32, x: f32) -> f32 {
     let t = a / b;
     let t2 = t * t;
     let r = t
-        * (0.9998660
-            + t2 * (-0.3302995
-                + t2 * (0.1801410
-                    + t2 * (-0.0851330 + t2 * 0.0208351))));
+        * (0.999_866_0
+            + t2 * (-0.330_299_5
+                + t2 * (0.180_141_0
+                    + t2 * (-0.085_133_0 + t2 * 0.020_835_1))));
 
     // Reconstruct quadrant.
     let r = if ay > ax { offset - r } else { r };

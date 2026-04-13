@@ -3,9 +3,7 @@ use std::f32::consts::PI;
 use crate::math::{Vec2, fast_atan2, fast_ln};
 use crate::state::{FlowSettings, NacaParams};
 
-use super::boundary_layer::{
-    self, BoundaryLayerInputs, SurfaceBLResult,
-};
+use super::boundary_layer::{self, BoundaryLayerInputs};
 
 mod geometry;
 mod panels;
@@ -98,6 +96,7 @@ impl PanelSolution {
     }
 }
 
+#[allow(dead_code)]
 fn integrate_cl_from_cp(
     x: &[f32],
     cp_upper: &[f32],
@@ -652,15 +651,16 @@ impl PanelLuSystem {
 /// Split panels into upper/lower surfaces for BL integration.
 /// Returns (upper_coords, upper_cp, lower_coords, lower_cp).
 /// Uses the swapped convention (geometry-lower = aero-upper).
+#[allow(dead_code)]
 fn split_panels_for_bl(
     panels: &[Panel],
     vt: &[f32],
     le_idx: usize,
 ) -> (Vec<Vec2>, Vec<f32>, Vec<Vec2>, Vec<f32>) {
     // "Upper" aerodynamic surface = geometry panels 0..=le_idx (reversed)
-    let mut upper_coords: Vec<Vec2> =
+    let upper_coords: Vec<Vec2> =
         (0..=le_idx).rev().map(|i| panels[i].mid).collect();
-    let mut upper_cp: Vec<f32> =
+    let upper_cp: Vec<f32> =
         (0..=le_idx).rev().map(|i| 1.0 - vt[i] * vt[i]).collect();
 
     // "Lower" aerodynamic surface = geometry panels le_idx+1..n
@@ -904,10 +904,10 @@ fn build_cp_samples(
             gamma,
         );
 
-        let mut cp_upper = (1.0
+        let cp_upper = (1.0
             - (freestream + induced_u).length_squared())
         .clamp(-3.0, 2.0);
-        let mut cp_lower = (1.0
+        let cp_lower = (1.0
             - (freestream + induced_l).length_squared())
         .clamp(-3.0, 2.0);
 
@@ -1303,10 +1303,12 @@ fn panel_influence(point: Vec2, panel: &Panel) -> (Vec2, Vec2) {
 }
 
 /// Backward-compatible wrappers used by Cp sampling and fallback paths.
+#[allow(dead_code)]
 fn line_source_velocity(point: Vec2, panel: &Panel) -> Vec2 {
     panel_influence(point, panel).0
 }
 
+#[allow(dead_code)]
 fn line_vortex_velocity(point: Vec2, panel: &Panel) -> Vec2 {
     panel_influence(point, panel).1
 }
