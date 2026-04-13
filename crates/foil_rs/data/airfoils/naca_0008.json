@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "id": "naca_0008",
+    "label": "NACA 0008",
+    "naca_code": "0008",
+    "source": "Abbott & Von Doenhoff, Theory of Wing Sections (1959); XFoil 6.99 validation runs"
+  },
+  "conditions": {
+    "reynolds": 3000000,
+    "mach": 0.0,
+    "ncrit": 9
+  },
+  "reference_points": [
+    { "alpha_deg":  0.0, "cl":  0.000, "cd": 0.00500, "cm_c4":  0.000 },
+    { "alpha_deg":  2.0, "cl":  0.218, "cd": 0.00520, "cm_c4":  0.001 },
+    { "alpha_deg":  4.0, "cl":  0.432, "cd": 0.00590, "cm_c4":  0.001 },
+    { "alpha_deg":  6.0, "cl":  0.637, "cd": 0.00710, "cm_c4":  0.000 },
+    { "alpha_deg":  8.0, "cl":  0.825, "cd": 0.00900, "cm_c4": -0.003 }
+  ],
+  "summary": {
+    "cl_alpha_per_rad": 6.30,
+    "cl_max": 0.95,
+    "alpha_stall_deg": 11.0,
+    "cd_min": 0.0050,
+    "alpha_zero_lift_deg": 0.0
+  }
+}

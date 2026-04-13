@@ -1,0 +1,6 @@
+[alias]
+qa  = "run -p foil_rs --example qa_check"
+cov = "llvm-cov --workspace --all-targets --html --open -- --test-threads=1"
+save-cov = "llvm-cov --workspace --summary-only"
+val = "run -p foil_rs --example validate_airfoils --release --"
+val-history = "run -p foil_rs --example validate_airfoils --release -- --history"

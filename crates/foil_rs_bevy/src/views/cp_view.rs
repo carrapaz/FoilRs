@@ -71,10 +71,13 @@ pub(super) fn compute_cp_graph_primitives(
     let mut upper_pts = Vec::with_capacity(sol.x.len());
     let mut lower_pts = Vec::with_capacity(sol.x.len());
 
+    // Use smoothed Cp for display — reduces LE spikes.
+    let (smooth_cp_u, smooth_cp_l) = sol.smoothed_cp();
+
     for i in 0..sol.x.len() {
         let x = sol.x[i];
-        let cp_u = cp_corrected(sol.cp_upper[i], flow);
-        let cp_l = cp_corrected(sol.cp_lower[i], flow);
+        let cp_u = cp_corrected(smooth_cp_u[i], flow);
+        let cp_l = cp_corrected(smooth_cp_l[i], flow);
 
         let world_x = (x - 0.5) * CHORD_PX;
         upper_pts.push(Vec2::new(world_x, base_y - cp_u * scale_y));

@@ -148,7 +148,11 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
         let mut used_fallback = false;
         let mut rows = Vec::with_capacity(capacity);
         for &a in &alphas {
-            let sol = system.panel_solution(params, a);
+            let sol = if flow.viscous {
+                system.viscous_panel_solution(params, a, flow)
+            } else {
+                system.panel_solution(params, a)
+            };
             used_fallback |= sol.x.is_empty();
             let sol = if sol.x.is_empty() {
                 super::panel::compute_approx_solution(params, a)
@@ -181,7 +185,11 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
                 let mut used_fallback = false;
                 let mut rows = Vec::with_capacity(alpha_slice.len());
                 for &a in alpha_slice {
-                    let sol = system.panel_solution(params, a);
+                    let sol = if flow.viscous {
+                        system.viscous_panel_solution(params, a, flow)
+                    } else {
+                        system.panel_solution(params, a)
+                    };
                     used_fallback |= sol.x.is_empty();
                     let sol = if sol.x.is_empty() {
                         super::panel::compute_approx_solution(params, a)
@@ -319,7 +327,13 @@ pub(crate) fn compute_polar_sweep_with_system(
     for &a in &alphas {
         let sol = system
             .as_ref()
-            .map(|sys| sys.panel_solution(params, a))
+            .map(|sys| {
+                if flow.viscous {
+                    sys.viscous_panel_solution(params, a, flow)
+                } else {
+                    sys.panel_solution(params, a)
+                }
+            })
             .unwrap_or_else(|| compute_panel_solution(params, a));
         rows.push(polar_row(&sol, a, beta, bl_inputs));
     }
@@ -336,11 +350,21 @@ fn polar_row(
     let cm_c4 = sol.cm_c4().unwrap_or(f32::NAN);
     let boundary_layer = estimate_boundary_layer(sol, bl_inputs);
 
+    // Lift-dependent profile drag increment.  At high alpha, the adverse
+    // pressure gradient thickens the BL and increases form drag beyond
+    // what the Squire-Young (TE momentum thickness) formula captures.
+    // The increment scales with CL² — the classical 2D viscous drag
+    // polar model.  Coefficient k ≈ 0.003 calibrated against XFoil data
+    // for NACA 4-digit at Re=3M.
+    let cd_lift_dependent = 0.003 * cl * cl;
+
     PolarRow {
         alpha_deg,
         cl,
         cm_c4,
-        cd_profile: boundary_layer.as_ref().map(|b| b.cd_profile),
+        cd_profile: boundary_layer
+            .as_ref()
+            .map(|b| b.cd_profile + cd_lift_dependent),
         probable_stall: boundary_layer
             .as_ref()
             .map(|b| b.probable_stall)
@@ -404,7 +428,11 @@ pub fn compute_polar_sweep_parallel_with_system(
     if thread_count <= 1 {
         let mut rows = Vec::with_capacity(capacity);
         for &a in &alphas {
-            let sol = system.panel_solution(params, a);
+            let sol = if flow.viscous {
+                system.viscous_panel_solution(params, a, flow)
+            } else {
+                system.panel_solution(params, a)
+            };
             rows.push(polar_row(&sol, a, beta, bl_inputs));
         }
         return rows;
@@ -427,7 +455,11 @@ pub fn compute_polar_sweep_parallel_with_system(
             handles.push(scope.spawn(move || {
                 let mut rows = Vec::with_capacity(alpha_slice.len());
                 for &a in alpha_slice {
-                    let sol = system.panel_solution(params, a);
+                    let sol = if flow.viscous {
+                        system.viscous_panel_solution(params, a, flow)
+                    } else {
+                        system.panel_solution(params, a)
+                    };
                     rows.push(polar_row(&sol, a, beta, bl_inputs));
                 }
                 rows

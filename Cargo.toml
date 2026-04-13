@@ -3,6 +3,11 @@ resolver = "3"
 members = ["crates/foil_rs", "crates/foil_rs_bevy"]
 default-members = ["crates/foil_rs_bevy"]
 
+[workspace.lints.clippy]
+# Library code must not panic — tests are exempt.
+unwrap_used = "warn"
+todo = "warn"
+
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

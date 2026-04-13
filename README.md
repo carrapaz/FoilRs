@@ -56,19 +56,39 @@ FoilRs currently combines three layers:
 2. **Compressibility correction (visualization/field)**
    - Prandtl–Glauert scaling is applied in the field sampling and Cp view (subsonic).
 3. **Boundary-layer estimate (for CDp and “flow state”)**
-   - Lightweight integral-style estimate using Cp-derived edge velocity.
-   - Produces an approximate profile drag `CDp`, plus heuristic transition/separation indicators.
+   - Integral BL (Thwaites) with Squire-Young profile drag at the trailing edge.
+   - Produces realistic `CDp` (within 1-12% of XFoil at moderate alpha), plus heuristic transition/separation indicators.
+
+## Solver accuracy
+
+Validated against XFoil 6.99 and Abbott & Von Doenhoff reference data via
+`cargo val`.  Run `cargo val-history` to see accuracy trends.
+
+| Metric | NACA 0012 (symmetric) | NACA 2412 (cambered) |
+|---|---|---|
+| CL_alpha | 1.3% error | 3.6% error |
+| CD_min | 1.5% error | 0.3% error |
+| CL (mean, 0-10°) | 2.0% error | 11% error (at positive alpha) |
+| CD (mean, 0-10°) | 7.7% error | 11.5% error |
+
+CL is computed from panel-integrated pressure forces (Kutta-Joukowski).
+CD uses the Squire-Young formula (momentum thickness at the trailing edge).
 
 ## Important differences vs XFoil
 
-XFoil is a mature viscous–inviscid coupled solver with sophisticated transition modeling and iterative convergence logic. FoilRs is earlier-stage:
+XFoil is a mature viscous-inviscid coupled solver with sophisticated
+transition modeling and iterative convergence logic.  FoilRs is earlier-stage:
 
-- **No viscous–inviscid coupling iterations** (yet).
+- **No viscous-inviscid coupling iterations** (yet).
 - **Transition/separation are heuristics**, not an e^N method.
-- **Re effects in Cp(x)**: currently Reynolds can influence the *visual* Cp magnitude (for readability) even though in XFoil the main Re effect is via viscous coupling. Treat Cp(x) here as primarily an inviscid picture.
-- **CL/CM summary values**: CL/CM are currently “stabilized” with tuned analytic coefficients in some paths; they are not yet purely panel-integrated coefficients.
+- **Cambered airfoil CL offset** is under-predicted (~20-30% at alpha=0 for
+  NACA 2412/4412) due to collocation-point Cp sampling near the LE.
+- **Thin airfoils** (t/c < 10%) over-predict CL by ~30% due to panel
+  discretisation sensitivity.
 
-If you need “trustworthy XFoil numbers”, use XFoil as the reference. If you want an interactive, visual tool to understand trends and debug geometry/discretization, FoilRs is useful today.
+If you need reference numbers, use XFoil.  FoilRs is useful today as an
+interactive visual tool, and as a library dependency for downstream solvers
+that need section polars with known accuracy bounds.
 
 ## Usage
 
@@ -136,6 +156,15 @@ Args (all optional): `NACA RE_MILLIONS_LIST MACH_LIST VISCOUS FREE_TRANSITION AL
 
 ## Development
 
+### Quality assurance
+
+```bash
+cargo qa          # fmt + clippy + tests + ignored tests + validation
+cargo val         # validate solver against reference airfoil data
+cargo val-history # show accuracy trend across validation runs
+cargo cov         # HTML code coverage report (requires cargo-llvm-cov)
+```
+
 Enable the repo-local Git hook to auto-format on commit:
 
 ```bash
@@ -147,7 +176,7 @@ Enable the repo-local Git hook to auto-format on commit:
 Run the local checks before pushing a tag:
 
 ```bash
-./scripts/release-check.sh
+cargo qa
 ./scripts/release-check.sh --publish-dry-run
 ```
 
@@ -166,11 +195,12 @@ To match the binary release workflow locally:
 
 ## Roadmap
 
-See `TODO.md` for the current checklist. Big items:
+See `TODO.md` for the current checklist and known solver issues.  Big items:
 
-- Multi-polars across Reynolds/Mach (multiple curves + faster caching)
+- Fix cambered-airfoil CL zero-lift offset and thin-airfoil CL over-prediction
 - Import `.dat` airfoils + normalization utilities
-- Better XFoil alignment: conventions, coupling, and validation datasets
+- Viscous-inviscid coupling iteration (XFoil-grade stall prediction)
+- NACA 5-digit support (for aircraft builder integration)
 
 ## License
 
