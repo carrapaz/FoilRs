@@ -15,9 +15,8 @@ pub fn resolved_surface_point_count(params: &NacaParams) -> usize {
 }
 
 fn le_clustering_exponent(params: &NacaParams) -> f32 {
-    let thinness =
-        ((ADAPTIVE_REFERENCE_THICKNESS - params.t()) / 0.08)
-            .clamp(0.0, 1.0);
+    let thinness = ((ADAPTIVE_REFERENCE_THICKNESS - params.t()) / 0.08)
+        .clamp(0.0, 1.0);
     (1.0 - 0.35 * thinness).clamp(0.7, 1.0)
 }
 

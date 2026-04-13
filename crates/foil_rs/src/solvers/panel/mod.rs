@@ -6,6 +6,7 @@ use crate::state::{FlowSettings, NacaParams};
 use super::boundary_layer::{self, BoundaryLayerInputs};
 
 mod geometry;
+mod linear;
 mod panels;
 
 use geometry::{

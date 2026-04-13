@@ -228,14 +228,58 @@ The current CL 11% / CD 8% / CM 7% with corrections is already usable
 for the aircraft builder integration.  The linear panel upgrade can
 happen later as a focused effort.
 
+### 2026-04-13 follow-up: first branch-cut prototype
+
+An additional open-contour Dirichlet prototype was sketched in
+`linear.rs` using:
+
+- prescribed source potentials,
+- nodal linear-doublet potential kernels,
+- a TE wake jump term, and
+- an explicit sharp-TE Kutta row.
+
+It compiled, but the first lift checks still **over-circulated badly**
+(symmetric `CL_alpha` far above `2π`, and negative-alpha cases could
+blow up).  That means the remaining issue is not just "wire in the wake
+jump" — the exact contour/wake coupling and Kutta treatment still need
+to match the real formulation much more closely.
+
+So: useful progress, but not yet something to expose as a public solver
+path.
+
+### 2026-04-14 follow-up: bounded Neumann prototype
+
+`linear.rs` now also has a gauge-fixed source + linear-vortex Neumann
+prototype, and the repo keeps it **in parallel** with the older
+Dirichlet branch-cut prototype instead of replacing it.  The Neumann
+path is currently the default smoke-test entry point because it does
+**not** blow up anymore:
+
+- symmetric NACA 0012 stays finite at `α = -4°, 0°, +4°`,
+- zero-alpha lift is down to a modest bias (`CL ≈ 0.56` in the current
+  smoke snapshot), and
+- the response changes with alpha instead of collapsing to a constant
+  over-circulated branch.
+
+But it is still not correct enough to expose:
+
+- the lift trend is still biased positive for both positive and negative
+  alpha, and
+- the recovered circulation still depends too much on ad hoc gauge /
+  Kutta choices.
+
+So this is a better sandbox for iteration, not a finished solver.
+
 ## Current state of the code
 
 - **`linear.rs`**: contains the verified source / constant-vortex /
-  linear-vortex velocity influence functions, the Neumann assembly with
-  prescribed sources, V_t recovery, and field-visualization induced
-  velocity.  The potential / branch-cut wake formulation is **not**
-  present in the checked-in code yet, and the module is not connected to
-  the active solver.
+  linear-vortex velocity influence functions plus the shared
+  experimental entry points.  The formulation-specific code now lives in
+  `linear/neumann.rs` and `linear/dirichlet.rs`, so the two prototypes
+  can evolve in parallel instead of overwriting each other.  Neither
+  path is sign-stable / accurate enough to wire into the active solver
+  yet, but both are now kept side-by-side so they can be compared
+  directly while we debug the formulation.
 
 - **`mod.rs`**: still uses the constant-strength Hess-Smith solver, but
   now relaxes leading-edge clustering for thin sections.  That cut the

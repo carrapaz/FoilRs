@@ -7,6 +7,26 @@ fn solve_cl(alpha_deg: f32) -> f32 {
     sol.cl().unwrap_or(0.0)
 }
 
+fn solve_linear_cl(params: &NacaParams, alpha_deg: f32) -> f32 {
+    solve_linear_cl_with_method(
+        params,
+        alpha_deg,
+        super::linear::ExperimentalMethod::NeumannLinearVortex,
+    )
+}
+
+fn solve_linear_cl_with_method(
+    params: &NacaParams,
+    alpha_deg: f32,
+    method: super::linear::ExperimentalMethod,
+) -> f32 {
+    super::linear::try_compute_solution_with_method(
+        params, alpha_deg, method,
+    )
+    .and_then(|sol| sol.cl())
+    .unwrap_or(f32::NAN)
+}
+
 #[test]
 fn cl_sign_matches_alpha() {
     let cl_pos = solve_cl(4.0);
@@ -85,4 +105,113 @@ fn odd_even_panel_counts_should_match() {
         cl_odd,
         diff
     );
+}
+
+#[test]
+fn experimental_linear_solver_stays_finite_for_symmetric_airfoil() {
+    let params = NacaParams {
+        m_digit: 0.0,
+        p_digit: 0.0,
+        t_digits: 12.0,
+        num_points: 160,
+    };
+
+    let cl_pos = solve_linear_cl(&params, 4.0);
+    let cl_zero = solve_linear_cl(&params, 0.0);
+    let cl_neg = solve_linear_cl(&params, -4.0);
+
+    println!(
+        "experimental linear solver finite check: cl(-4)={}, cl(0)={}, cl(+4)={}",
+        cl_neg, cl_zero, cl_pos
+    );
+
+    assert!(
+        cl_neg.is_finite() && cl_neg.abs() < 20.0,
+        "expected bounded lift from experimental linear solver, got {}",
+        cl_neg
+    );
+    assert!(
+        cl_zero.is_finite() && cl_zero.abs() < 2.0,
+        "expected bounded zero-alpha lift from experimental linear solver, got {}",
+        cl_zero
+    );
+    assert!(
+        cl_pos.is_finite() && cl_pos.abs() < 20.0,
+        "expected bounded lift from experimental linear solver, got {}",
+        cl_pos
+    );
+}
+
+#[test]
+fn experimental_linear_solver_responds_to_alpha_changes() {
+    let params = NacaParams {
+        m_digit: 0.0,
+        p_digit: 0.0,
+        t_digits: 12.0,
+        num_points: 160,
+    };
+
+    let cl_neg = solve_linear_cl(&params, -2.0);
+    let cl_zero = solve_linear_cl(&params, 0.0);
+    let cl_pos = solve_linear_cl(&params, 2.0);
+    let delta = (cl_pos - cl_neg).abs();
+
+    println!(
+        "experimental linear solver alpha response: cl(-2)={}, cl(0)={}, cl(+2)={}, |delta|={}",
+        cl_neg, cl_zero, cl_pos, delta
+    );
+
+    assert!(
+        cl_zero.is_finite() && cl_zero.abs() < 2.0,
+        "expected bounded zero-alpha lift for symmetric airfoil, got {}",
+        cl_zero
+    );
+    assert!(
+        delta.is_finite() && delta > 0.25,
+        "expected the experimental linear solver to react to alpha changes, got |delta|={}",
+        delta
+    );
+}
+
+#[test]
+#[ignore = "diagnostic snapshot for experimental linear-panel state"]
+fn experimental_linear_solver_snapshot() {
+    let params = NacaParams {
+        m_digit: 0.0,
+        p_digit: 0.0,
+        t_digits: 12.0,
+        num_points: 160,
+    };
+
+    for alpha_deg in [-4.0_f32, 0.0, 4.0] {
+        let snapshot =
+            super::linear::debug_snapshot(&params, alpha_deg);
+        println!("snapshot alpha={} deg -> {:?}", alpha_deg, snapshot);
+    }
+}
+
+#[test]
+#[ignore = "diagnostic comparison of parallel experimental linear-panel methods"]
+fn experimental_linear_solver_compare_parallel_methods() {
+    let params = NacaParams {
+        m_digit: 0.0,
+        p_digit: 0.0,
+        t_digits: 12.0,
+        num_points: 160,
+    };
+
+    let methods = [
+        super::linear::ExperimentalMethod::NeumannLinearVortex,
+        super::linear::ExperimentalMethod::DirichletDoublet,
+    ];
+
+    for method in methods {
+        println!("method={}", method.label());
+        for alpha_deg in [-4.0_f32, 0.0, 4.0] {
+            let snapshot = super::linear::debug_snapshot_for_method(
+                &params, alpha_deg, method,
+            );
+            println!("  alpha={} deg -> {:?}", alpha_deg, snapshot);
+        }
+    }
 }
