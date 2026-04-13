@@ -15,10 +15,12 @@ use bevy::{
 use crate::state::NacaParams;
 
 use super::super::types::{
-    CoeffModeButton, ExportPolarsButton, ExportStatusText,
+    CoeffModeButton, ExperimentalMethodButton,
+    ExperimentalMethodControls, ExportPolarsButton, ExportStatusText,
     FallbackWarningBadge, FallbackWarningText, InputModeButton,
     NacaHeading, ThemeToggleButton, TopBar, UiCoeffMode,
-    UiColorThemeMode, UiInputMode, ViewButton, VisualMode,
+    UiColorThemeMode, UiExperimentalMethod, UiInputMode, ViewButton,
+    VisualMode,
 };
 
 const TOP_BAR_HEIGHT: f32 = 56.0;
@@ -30,6 +32,7 @@ pub(super) fn spawn_top_bar(
     mode: VisualMode,
     input_mode: UiInputMode,
     coeff_mode: UiCoeffMode,
+    experimental_method: UiExperimentalMethod,
     theme_mode: UiColorThemeMode,
     export_status: &str,
 ) {
@@ -155,9 +158,11 @@ pub(super) fn spawn_top_bar(
                 tokens::TEXT_DIM,
                 (),
             );
-            for &coeff_option in
-                &[UiCoeffMode::Panel, UiCoeffMode::Approx]
-            {
+            for &coeff_option in &[
+                UiCoeffMode::Panel,
+                UiCoeffMode::Experimental,
+                UiCoeffMode::Approx,
+            ] {
                 spawn_pill_button(
                     tabs,
                     coeff_option.label(),
@@ -166,6 +171,45 @@ pub(super) fn spawn_top_bar(
                     CoeffModeButton { mode: coeff_option },
                 );
             }
+
+            tabs.spawn((
+                Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(8.0),
+                    display: if coeff_mode == UiCoeffMode::Experimental
+                    {
+                        Display::Flex
+                    } else {
+                        Display::None
+                    },
+                    ..default()
+                },
+                ExperimentalMethodControls,
+            ))
+            .with_children(|methods| {
+                spawn_themed_text(
+                    methods,
+                    "Method",
+                    ui_font.clone(),
+                    13.0,
+                    tokens::TEXT_DIM,
+                    (),
+                );
+
+                for &method in &[
+                    UiExperimentalMethod::Neumann,
+                    UiExperimentalMethod::Dirichlet,
+                ] {
+                    spawn_pill_button(
+                        methods,
+                        method.label(),
+                        ui_font.clone(),
+                        method == experimental_method,
+                        ExperimentalMethodButton { method },
+                    );
+                }
+            });
 
             tabs.spawn((
                 Node {

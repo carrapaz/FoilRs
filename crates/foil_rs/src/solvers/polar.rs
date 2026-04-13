@@ -1,8 +1,9 @@
 use crate::state::{FlowSettings, NacaParams};
 
-use super::panel::PanelLuSystem;
+use super::panel::{ExperimentalPanelMethod, PanelLuSystem};
 use super::{
-    BoundaryLayerInputs, PanelSolution, compute_panel_solution,
+    BoundaryLayerInputs, PanelSolution,
+    compute_experimental_panel_solution, compute_panel_solution,
     estimate_boundary_layer,
 };
 
@@ -24,6 +25,8 @@ pub struct PolarRow {
 pub enum PolarMode {
     /// Solve with the panel system and derive coefficients from Cp.
     Panel,
+    /// Use one of the experimental higher-order panel formulations.
+    Experimental(ExperimentalPanelMethod),
     /// Use the cheap approximate Cp/coefficients model.
     Approx,
 }
@@ -101,6 +104,37 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
         return PolarSweepResult {
             rows,
             used_fallback: false,
+        };
+    }
+
+    if let PolarMode::Experimental(method) = mode {
+        let beta =
+            (1.0 - flow.mach * flow.mach).clamp(0.05, 1.0).sqrt();
+        let bl_inputs = BoundaryLayerInputs::new(
+            flow.reynolds,
+            flow.mach,
+            flow.viscous,
+            flow.free_transition,
+            DEFAULT_FORCED_TRIP_X,
+        );
+        let bl_inputs = &bl_inputs;
+
+        let mut used_fallback = false;
+        let mut rows = Vec::with_capacity(capacity);
+        for &a in &alphas {
+            let sol =
+                compute_experimental_panel_solution(params, a, method);
+            used_fallback |= sol.x.is_empty();
+            let sol = if sol.x.is_empty() {
+                super::panel::compute_approx_solution(params, a)
+            } else {
+                sol
+            };
+            rows.push(polar_row(&sol, a, beta, bl_inputs));
+        }
+        return PolarSweepResult {
+            rows,
+            used_fallback,
         };
     }
 

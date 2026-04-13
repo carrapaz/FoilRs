@@ -8,7 +8,8 @@ use crate::airfoil::build_naca_body_geometry;
 use crate::plotter::{CpPlotLabels, PolarPlotLabels};
 use crate::state::{FlowSettings, NacaParams};
 use crate::ui::{
-    PolarSweepSettings, SolverDiagnostics, UiCoeffMode, VisualMode,
+    PolarSweepSettings, SolverDiagnostics, UiCoeffMode,
+    UiExperimentalMethod, VisualMode,
 };
 
 mod cp_view;
@@ -68,14 +69,25 @@ pub struct VizCache {
     panel_key: Option<(NacaKey, u32)>,
     panel_prims: PanelPrimitives,
 
-    cp_key: Option<(NacaKey, u32, u32, u32, u32, u32, bool, u8)>,
+    cp_key: Option<(NacaKey, u32, u32, u32, u32, u32, bool, u8, u8)>,
     cp_prims: Option<CpGraphPrimitives>,
     cp_used_fallback: bool,
     cp_labels_key: Option<(u32, u32)>,
     cp_labels_dirty: bool,
 
-    polar_key:
-        Option<(NacaKey, u32, u32, bool, bool, u32, u32, u32, u8, u8)>,
+    polar_key: Option<(
+        NacaKey,
+        u32,
+        u32,
+        bool,
+        bool,
+        u32,
+        u32,
+        u32,
+        u8,
+        u8,
+        u8,
+    )>,
     polar_prims: Option<PolarGraphPrimitives>,
     polar_labels_dirty: bool,
 }
@@ -90,6 +102,7 @@ pub fn draw_airfoil_and_visualization(
     flow: Res<FlowSettings>,
     sweep: Res<PolarSweepSettings>,
     coeff_mode: Res<UiCoeffMode>,
+    experimental_method: Res<UiExperimentalMethod>,
     mode: Res<VisualMode>,
     mut diag: ResMut<SolverDiagnostics>,
     mut gizmos: Gizmos,
@@ -241,6 +254,7 @@ pub fn draw_airfoil_and_visualization(
                 scale_y.to_bits(),
                 flow.viscous,
                 *coeff_mode as u8,
+                *experimental_method as u8,
             );
             if cache.cp_key != Some(key) {
                 cache.cp_key = Some(key);
@@ -252,6 +266,7 @@ pub fn draw_airfoil_and_visualization(
                         scale_y,
                         cache.panel_system.as_ref(),
                         *coeff_mode,
+                        *experimental_method,
                     );
                 cache.cp_prims = prims;
                 cache.cp_used_fallback = used_fallback;
@@ -302,6 +317,7 @@ pub fn draw_airfoil_and_visualization(
                 sweep.alpha_step_deg.to_bits(),
                 sweep.threads,
                 *coeff_mode as u8,
+                *experimental_method as u8,
             );
             if cache.polar_key != Some(key) {
                 cache.polar_key = Some(key);
@@ -314,6 +330,7 @@ pub fn draw_airfoil_and_visualization(
                     threads,
                     cache.panel_system.as_ref(),
                     *coeff_mode,
+                    *experimental_method,
                 ));
                 cache.polar_labels_dirty = true;
             }

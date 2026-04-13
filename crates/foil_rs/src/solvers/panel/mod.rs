@@ -15,6 +15,8 @@ use geometry::{
 };
 use panels::{Panel, build_panels};
 
+pub use linear::ExperimentalMethod as ExperimentalPanelMethod;
+
 const SURFACE_SAMPLE_EPS: f32 = 1e-4;
 const COLLOCATION_OFFSET: f32 = 1e-4;
 
@@ -802,6 +804,29 @@ pub fn compute_panel_solution(
         &source_strengths,
         gamma,
     )
+}
+
+pub fn compute_experimental_panel_solution(
+    params: &NacaParams,
+    alpha_deg: f32,
+    method: ExperimentalPanelMethod,
+) -> PanelSolution {
+    if let Some(sol) = linear::try_compute_solution_with_method(
+        params, alpha_deg, method,
+    ) {
+        return sol;
+    }
+
+    let (cl, cm_c4, _) = approx_section_coeffs(params, alpha_deg);
+    PanelSolution {
+        x: Vec::new(),
+        cp_upper: Vec::new(),
+        cp_lower: Vec::new(),
+        upper_coords: Vec::new(),
+        lower_coords: Vec::new(),
+        cl_cached: Some(cl),
+        cm_c4_cached: Some(cm_c4),
+    }
 }
 
 /// Quick analytic fallback (old toy model) used for visualization when the

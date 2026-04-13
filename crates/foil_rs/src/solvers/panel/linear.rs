@@ -23,13 +23,13 @@ mod neumann;
 const COLLLOCATION_OFFSET: f32 = 1e-4;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum ExperimentalMethod {
+pub enum ExperimentalMethod {
     NeumannLinearVortex,
     DirichletDoublet,
 }
 
 impl ExperimentalMethod {
-    pub(super) fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Self::NeumannLinearVortex => "neumann-linear-vortex",
             Self::DirichletDoublet => "dirichlet-doublet",

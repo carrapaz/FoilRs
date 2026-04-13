@@ -21,6 +21,7 @@ fn main() {
         .insert_resource(ui::PolarSweepSettings::default())
         .insert_resource(VisualMode::Field)
         .init_resource::<ui::UiCoeffMode>()
+        .init_resource::<ui::UiExperimentalMethod>()
         .init_resource::<ui::UiInputMode>()
         .insert_resource(ui::PanelSections::default())
         .init_resource::<ui::NumericInputFocus>()
@@ -78,7 +79,10 @@ fn main() {
             Update,
             (
                 ui::handle_coeff_mode_buttons,
+                ui::handle_experimental_method_buttons,
                 ui::update_coeff_mode_button_styles,
+                ui::update_experimental_method_button_styles,
+                ui::update_experimental_method_visibility,
                 ui::update_fallback_warning_badge,
                 ui::update_numeric_input_visibility,
                 ui::handle_numeric_input_focus,

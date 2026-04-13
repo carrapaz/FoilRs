@@ -3,7 +3,7 @@ use bevy::{color::palettes::css, prelude::*};
 use crate::{
     plotter::{PolarPlotLabels, refresh_polar_labels},
     state::{FlowSettings, NacaParams},
-    ui::UiCoeffMode,
+    ui::{UiCoeffMode, UiExperimentalMethod},
     views::CHORD_PX,
 };
 
@@ -32,9 +32,15 @@ pub(super) fn compute_polar_primitives(
     threads: Option<usize>,
     panel_system: Option<&crate::solvers::panel::PanelLuSystem>,
     coeff_mode: UiCoeffMode,
+    experimental_method: UiExperimentalMethod,
 ) -> PolarGraphPrimitives {
     let mode = match coeff_mode {
         UiCoeffMode::Panel => crate::solvers::polar::PolarMode::Panel,
+        UiCoeffMode::Experimental => {
+            crate::solvers::polar::PolarMode::Experimental(
+                experimental_method.to_solver_method(),
+            )
+        }
         UiCoeffMode::Approx => crate::solvers::polar::PolarMode::Approx,
     };
     let res = crate::solvers::polar::compute_polar_sweep_parallel_with_system_mode(

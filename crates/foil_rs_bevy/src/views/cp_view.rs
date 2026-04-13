@@ -4,7 +4,7 @@ use crate::{
     plotter::{CpPlotLabels, refresh_cp_labels},
     solvers,
     state::{FlowSettings, NacaParams},
-    ui::UiCoeffMode,
+    ui::{UiCoeffMode, UiExperimentalMethod},
     views::CHORD_PX,
 };
 
@@ -40,6 +40,7 @@ pub(super) fn compute_cp_graph_primitives(
     scale_y: f32,
     panel_system: Option<&crate::solvers::panel::PanelLuSystem>,
     coeff_mode: UiCoeffMode,
+    experimental_method: UiExperimentalMethod,
 ) -> (Option<CpGraphPrimitives>, bool) {
     let mut used_fallback = false;
     let sol = match coeff_mode {
@@ -47,6 +48,23 @@ pub(super) fn compute_cp_graph_primitives(
             params,
             flow.alpha_deg,
         ),
+        UiCoeffMode::Experimental => {
+            let sol =
+                solvers::panel::compute_experimental_panel_solution(
+                    params,
+                    flow.alpha_deg,
+                    experimental_method.to_solver_method(),
+                );
+            if sol.x.is_empty() {
+                used_fallback = true;
+                solvers::panel::compute_approx_solution(
+                    params,
+                    flow.alpha_deg,
+                )
+            } else {
+                sol
+            }
+        }
         UiCoeffMode::Panel => {
             let sol = panel_system
                 .map(|sys| sys.panel_solution(params, flow.alpha_deg))

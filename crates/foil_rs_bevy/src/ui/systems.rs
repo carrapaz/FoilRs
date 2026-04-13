@@ -13,13 +13,14 @@ use bevy::{
 
 use crate::solvers::panel::PanelLuSystem;
 use crate::solvers::{
-    BoundaryLayerInputs, compute_panel_solution,
-    estimate_boundary_layer,
+    BoundaryLayerInputs, compute_experimental_panel_solution,
+    compute_panel_solution, estimate_boundary_layer,
 };
 use crate::state::{FlowSettings, NacaParams, cl_thin};
 
 use super::types::{
-    CoeffModeButton, ExportPolarsButton, ExportStatus,
+    CoeffModeButton, ExperimentalMethodButton,
+    ExperimentalMethodControls, ExportPolarsButton, ExportStatus,
     ExportStatusText, FallbackWarningBadge, FlowAlphaControls,
     FlowToggleKind, InputModeButton, InputSlider,
     LeftPanelMainControls, LeftPanelPanelControls, NacaHeading,
@@ -27,7 +28,8 @@ use super::types::{
     NumericInputText, PanelCountText, PanelSections,
     PolarSweepSettings, PolarsControls, SectionContent, SectionToggle,
     SolverDiagnostics, TableField, ThemeToggleButton, UiCoeffMode,
-    UiColorThemeMode, UiInputMode, ViewButton, VisualMode,
+    UiColorThemeMode, UiExperimentalMethod, UiInputMode, ViewButton,
+    VisualMode,
 };
 use super::{config, feathers_theme, style};
 use std::path::{Path, PathBuf};
@@ -151,6 +153,7 @@ pub fn handle_export_polars_button(
     flow: Res<FlowSettings>,
     sweep: Res<PolarSweepSettings>,
     coeff_mode: Res<UiCoeffMode>,
+    experimental_method: Res<UiExperimentalMethod>,
 ) {
     for interaction in &mut q {
         if !matches!(*interaction, Interaction::Pressed) {
@@ -164,6 +167,11 @@ pub fn handle_export_polars_button(
         let mode = match *coeff_mode {
             UiCoeffMode::Panel => {
                 crate::solvers::polar::PolarMode::Panel
+            }
+            UiCoeffMode::Experimental => {
+                crate::solvers::polar::PolarMode::Experimental(
+                    experimental_method.to_solver_method(),
+                )
             }
             UiCoeffMode::Approx => {
                 crate::solvers::polar::PolarMode::Approx
@@ -711,6 +719,20 @@ pub fn handle_coeff_mode_buttons(
     }
 }
 
+pub fn handle_experimental_method_buttons(
+    mut method: ResMut<UiExperimentalMethod>,
+    mut q: Query<
+        (&Interaction, &ExperimentalMethodButton),
+        Changed<Interaction>,
+    >,
+) {
+    for (interaction, button) in &mut q {
+        if matches!(*interaction, Interaction::Pressed) {
+            *method = button.method;
+        }
+    }
+}
+
 pub fn update_coeff_mode_button_styles(
     coeff_mode: Res<UiCoeffMode>,
     mut commands: Commands,
@@ -745,6 +767,60 @@ pub fn update_coeff_mode_button_styles(
                 ThemeFontColor(desired_font),
             ));
         }
+    }
+}
+
+pub fn update_experimental_method_button_styles(
+    method: Res<UiExperimentalMethod>,
+    mut commands: Commands,
+    mut q: Query<(
+        Entity,
+        &ExperimentalMethodButton,
+        Option<&ThemeBackgroundColor>,
+        Option<&ThemeFontColor>,
+    )>,
+) {
+    if !method.is_changed() {
+        return;
+    }
+    for (entity, button, bg, font) in &mut q {
+        let selected = button.method == *method;
+        let desired_bg = if selected {
+            tokens::BUTTON_PRIMARY_BG
+        } else {
+            tokens::BUTTON_BG
+        };
+        let desired_font = if selected {
+            tokens::BUTTON_PRIMARY_TEXT
+        } else {
+            tokens::BUTTON_TEXT
+        };
+
+        let bg_ok = bg.is_some_and(|t| t.0 == desired_bg);
+        let font_ok = font.is_some_and(|t| t.0 == desired_font);
+        if !bg_ok || !font_ok {
+            commands.entity(entity).insert((
+                ThemeBackgroundColor(desired_bg),
+                ThemeFontColor(desired_font),
+            ));
+        }
+    }
+}
+
+pub fn update_experimental_method_visibility(
+    coeff_mode: Res<UiCoeffMode>,
+    mut controls: Query<&mut Node, With<ExperimentalMethodControls>>,
+) {
+    if !coeff_mode.is_changed() {
+        return;
+    }
+    let display = if *coeff_mode == UiCoeffMode::Experimental {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    for mut node in &mut controls {
+        node.display = display;
     }
 }
 
@@ -801,12 +877,14 @@ pub fn update_table_text(
     params: Res<NacaParams>,
     flow: Res<FlowSettings>,
     coeff_mode: Res<UiCoeffMode>,
+    experimental_method: Res<UiExperimentalMethod>,
     mut query: Query<(&mut Text, &TableField)>,
     mut cache: Local<UiPanelSystemCache>,
 ) {
     if !params.is_changed()
         && !flow.is_changed()
         && !coeff_mode.is_changed()
+        && !experimental_method.is_changed()
     {
         return;
     }
@@ -824,6 +902,21 @@ pub fn update_table_text(
                 &params,
                 flow.alpha_deg,
             )
+        }
+        UiCoeffMode::Experimental => {
+            let sol = compute_experimental_panel_solution(
+                &params,
+                flow.alpha_deg,
+                experimental_method.to_solver_method(),
+            );
+            if sol.x.is_empty() {
+                crate::solvers::panel::compute_approx_solution(
+                    &params,
+                    flow.alpha_deg,
+                )
+            } else {
+                sol
+            }
         }
         UiCoeffMode::Panel => {
             let sol = cache

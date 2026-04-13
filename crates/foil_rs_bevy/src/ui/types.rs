@@ -89,6 +89,7 @@ pub struct PanelSections {
 #[derive(Resource, Clone, Copy, PartialEq, Eq)]
 pub enum UiCoeffMode {
     Panel,
+    Experimental,
     Approx,
 }
 
@@ -102,7 +103,42 @@ impl UiCoeffMode {
     pub fn label(self) -> &'static str {
         match self {
             Self::Panel => "Panel",
+            Self::Experimental => "Linear Exp",
             Self::Approx => "Approx",
+        }
+    }
+}
+
+#[derive(Resource, Clone, Copy, PartialEq, Eq)]
+pub enum UiExperimentalMethod {
+    Neumann,
+    Dirichlet,
+}
+
+impl Default for UiExperimentalMethod {
+    fn default() -> Self {
+        Self::Neumann
+    }
+}
+
+impl UiExperimentalMethod {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Neumann => "Neumann",
+            Self::Dirichlet => "Dirichlet",
+        }
+    }
+
+    pub fn to_solver_method(
+        self,
+    ) -> crate::solvers::panel::ExperimentalPanelMethod {
+        match self {
+            Self::Neumann => {
+                crate::solvers::panel::ExperimentalPanelMethod::NeumannLinearVortex
+            }
+            Self::Dirichlet => {
+                crate::solvers::panel::ExperimentalPanelMethod::DirichletDoublet
+            }
         }
     }
 }
@@ -195,6 +231,14 @@ pub struct ThemeToggleButton;
 pub struct CoeffModeButton {
     pub mode: UiCoeffMode,
 }
+
+#[derive(Component)]
+pub struct ExperimentalMethodButton {
+    pub method: UiExperimentalMethod,
+}
+
+#[derive(Component)]
+pub struct ExperimentalMethodControls;
 
 #[derive(Component)]
 pub struct FallbackWarningText;
