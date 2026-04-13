@@ -148,7 +148,7 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
         let mut used_fallback = false;
         let mut rows = Vec::with_capacity(capacity);
         for &a in &alphas {
-            let sol = if false && flow.viscous {
+            let sol = if flow.viscous {
                 system.viscous_panel_solution(params, a, flow)
             } else {
                 system.panel_solution(params, a)
@@ -185,7 +185,7 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
                 let mut used_fallback = false;
                 let mut rows = Vec::with_capacity(alpha_slice.len());
                 for &a in alpha_slice {
-                    let sol = if false && flow.viscous {
+                    let sol = if flow.viscous {
                         system.viscous_panel_solution(params, a, flow)
                     } else {
                         system.panel_solution(params, a)
@@ -328,7 +328,7 @@ pub(crate) fn compute_polar_sweep_with_system(
         let sol = system
             .as_ref()
             .map(|sys| {
-                if false && flow.viscous {
+                if flow.viscous {
                     sys.viscous_panel_solution(params, a, flow)
                 } else {
                     sys.panel_solution(params, a)
@@ -428,7 +428,7 @@ pub fn compute_polar_sweep_parallel_with_system(
     if thread_count <= 1 {
         let mut rows = Vec::with_capacity(capacity);
         for &a in &alphas {
-            let sol = if false && flow.viscous {
+            let sol = if flow.viscous {
                 system.viscous_panel_solution(params, a, flow)
             } else {
                 system.panel_solution(params, a)
@@ -455,7 +455,7 @@ pub fn compute_polar_sweep_parallel_with_system(
             handles.push(scope.spawn(move || {
                 let mut rows = Vec::with_capacity(alpha_slice.len());
                 for &a in alpha_slice {
-                    let sol = if false && flow.viscous {
+                    let sol = if flow.viscous {
                         system.viscous_panel_solution(params, a, flow)
                     } else {
                         system.panel_solution(params, a)
