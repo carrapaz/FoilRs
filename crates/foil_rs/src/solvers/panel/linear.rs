@@ -1,8 +1,15 @@
-//! Constant-doublet + constant-source Dirichlet panel method.
+//! Neumann source + linear-vortex panel method.
 //!
-//! Source σ_j = V∞·n_j (Morino, prescribed). Unknowns: μ_0..μ_{N-1}
-//! (panel doublets) + μ_wake (wake doublet). Total: N+1.
-//! Equations: N (Dirichlet) + 1 (Kutta: μ_wake = μ_upper - μ_lower).
+//! Sources: σ_j = V∞·n_j (prescribed, Morino). NOT unknowns.
+//! Unknowns: γ_0..γ_N (N+1 node vortex strengths, linear per panel).
+//! Equations: N normal BCs + 1 Kutta = N+1.
+//! Matrix: (N+1)×(N+1).
+//!
+//! The normal BC at each panel midpoint is:
+//!   Σ_j [vort_influence · n_i] × γ_j = -V∞·n_i - Σ_j [source_vel · n_i] × σ_j
+//!
+//! The RHS absorbs both the freestream and the known source contribution.
+//! The source velocity represents the non-lifting (thickness) part.
 
 use std::f32::consts::PI;
 
@@ -10,92 +17,101 @@ use crate::math::{Vec2, fast_atan2, fast_ln};
 
 use super::panels::Panel;
 
+const COLLOCATION_OFFSET: f32 = 1e-4;
+
+/// Returns (source_vel, vort_left_vel, vort_right_vel).
 #[inline]
-fn source_potential(point: Vec2, panel: &Panel) -> f32 {
+#[allow(clippy::excessive_precision)]
+fn panel_influence(point: Vec2, panel: &Panel) -> (Vec2, Vec2, Vec2) {
     let dx = point.x - panel.start.x;
     let dy = point.y - panel.start.y;
-    let x = dx * panel.tangent.x + dy * panel.tangent.y;
-    let y = dx * panel.normal.x + dy * panel.normal.y;
-    let y = if y.abs() < 1e-8 {
-        if y >= 0.0 { 1e-8 } else { -1e-8 }
+    let xl = dx * panel.tangent.x + dy * panel.tangent.y;
+    let yl = dx * panel.normal.x + dy * panel.normal.y;
+    let yl = if yl.abs() < 1e-6 {
+        if yl >= 0.0 { 1e-6 } else { -1e-6 }
     } else {
-        y
+        yl
     };
-    let x2 = x - panel.length;
-    let r1_sq = (x * x + y * y).max(1e-14);
-    let r2_sq = (x2 * x2 + y * y).max(1e-14);
-    let atan_term = fast_atan2(y, x2) - fast_atan2(y, x);
-    (1.0 / (4.0 * PI))
-        * (x * fast_ln(r1_sq)
-            - x2 * fast_ln(r2_sq)
-            - 2.0 * panel.length
-            + 2.0 * y * atan_term)
+    let x2 = xl - panel.length;
+    let len = panel.length.max(1e-8);
+    let r1sq = (xl * xl + yl * yl).max(1e-12);
+    let r2sq = (x2 * x2 + yl * yl).max(1e-12);
+    let ln_t = fast_ln(r2sq / r1sq);
+    let at_t = fast_atan2(yl, x2) - fast_atan2(yl, xl);
+    let i2p = 1.0 / (2.0 * PI);
+    let i4p = 1.0 / (4.0 * PI);
+    let i2pl = i2p / len;
+
+    let src =
+        panel.tangent * (ln_t * i4p) + panel.normal * (at_t * i2p);
+    let uc = -at_t * i2p;
+    let vc = ln_t * i4p;
+    let ur = -i2pl * (xl * at_t + 0.5 * yl * ln_t);
+    let vr = i2pl * (-0.5 * xl * ln_t + yl * at_t - len);
+    let vl = panel.tangent * (uc - ur) + panel.normal * (vc - vr);
+    let vrt = panel.tangent * ur + panel.normal * vr;
+
+    (src, vl, vrt)
 }
 
-#[inline]
-fn doublet_potential(point: Vec2, panel: &Panel) -> f32 {
-    let dx = point.x - panel.start.x;
-    let dy = point.y - panel.start.y;
-    let x = dx * panel.tangent.x + dy * panel.tangent.y;
-    let y = dx * panel.normal.x + dy * panel.normal.y;
-    let y = if y.abs() < 1e-8 {
-        if y >= 0.0 { 1e-8 } else { -1e-8 }
-    } else {
-        y
-    };
-    let x2 = x - panel.length;
-    let atan_term = fast_atan2(y, x2) - fast_atan2(y, x);
-    -atan_term / (2.0 * PI)
-}
-
-/// Wake potential: semi-infinite doublet panel from TE along +x.
-/// For a point P at distance d from TE, the potential is -(1/2π)·θ
-/// where θ = atan2(y, x) in TE-centered coordinates.
-#[inline]
-fn wake_potential(point: Vec2, te_pos: Vec2) -> f32 {
-    let d = point - te_pos;
-    -fast_atan2(d.y, d.x) / (2.0 * PI)
-}
-
-/// Assemble (N+1)×(N+1) matrix.
+/// Assemble the (N+1)×(N+1) matrix.
 ///
-/// Unknowns x[0..N] = μ_0..μ_{N-1} (panel doublets), x[N] = μ_wake.
-/// Rows 0..N-1: Dirichlet BC (φ_internal = 0 at each panel midpoint).
-/// Row N: Kutta (μ_wake = μ_{te_upper} - μ_{te_lower}).
+/// LHS: linear vortex influence (normal component) at each collocation pt.
+/// RHS: -(freestream + source velocity) normal component.
 pub(super) fn assemble(
     panels: &[Panel],
     te_upper: usize,
     te_lower: usize,
-) -> (Vec<f32>, usize) {
+) -> (Vec<f32>, Vec<f32>, usize) {
     let n = panels.len();
     let size = n + 1;
     let mut matrix = vec![0.0_f32; size * size];
+    let mut tan_infl = vec![0.0_f32; n * size]; // for V_t recovery
 
-    let te_pos = 0.5 * (panels[te_upper].mid + panels[te_lower].mid);
+    for (i, pi) in panels.iter().enumerate() {
+        let colloc = pi.mid + pi.normal * COLLOCATION_OFFSET;
 
-    // Dirichlet rows: 0.5·μ_i + Σ_{j≠i} doublet_pot × μ_j + wake_pot × μ_wake = RHS
-    for i in 0..n {
-        let pt = panels[i].mid;
-        for j in 0..n {
-            matrix[i * size + j] = if i == j {
-                0.5
-            } else {
-                doublet_potential(pt, &panels[j])
-            };
+        for (j, pj) in panels.iter().enumerate() {
+            let (src, vl, vr) = panel_influence(colloc, pj);
+            let j1 = j + 1;
+
+            // Normal BC: vortex only (source goes to RHS).
+            matrix[i * size + j] += vl.dot(pi.normal);
+            matrix[i * size + j1] += vr.dot(pi.normal);
+
+            // Tangent influence for V_t recovery.
+            tan_infl[i * size + j] += src.dot(pi.tangent); // source V_t (will multiply by σ at runtime)
+            // ... actually we need to store vortex tangent influence too.
+            // Let me separate source_tan and vort_tan.
         }
-        // Wake column (index N).
-        matrix[i * size + n] = wake_potential(pt, te_pos);
     }
 
-    // Kutta row: μ_wake - μ_{te_upper} + μ_{te_lower} = 0
-    matrix[n * size + n] = 1.0;
-    matrix[n * size + te_upper] = 1.0;
-    matrix[n * size + te_lower] = -1.0;
+    // Hmm, the tan_infl needs both source and vortex components.
+    // For V_t recovery: V_t = V∞·t + Σ_j source_vel·t × σ_j + Σ_j vort_vel·t × γ_j
+    // The source σ_j = V∞·n_j is known at runtime (depends on freestream).
+    // So we can't pre-cache the source V_t contribution.
+    // → tan_infl stores ONLY the vortex tangent influence.
+    // The source V_t is computed at runtime in tangential_velocities().
 
-    (matrix, size)
+    // Redo: tan_infl = vortex tangent influence only.
+    tan_infl.fill(0.0);
+    for (i, pi) in panels.iter().enumerate() {
+        let colloc = pi.mid + pi.normal * COLLOCATION_OFFSET;
+        for (j, pj) in panels.iter().enumerate() {
+            let (_src, vl, vr) = panel_influence(colloc, pj);
+            tan_infl[i * size + j] += vl.dot(pi.tangent);
+            tan_infl[i * size + j + 1] += vr.dot(pi.tangent);
+        }
+    }
+
+    // Kutta: γ_0 + γ_N = 0 (zero vortex at both TE nodes).
+    matrix[n * size + 0] = 1.0;
+    matrix[n * size + n] = 1.0;
+
+    (matrix, tan_infl, size)
 }
 
-/// RHS: -(source potential + freestream potential) at each panel midpoint.
+/// Build the RHS.
 pub(super) fn assemble_rhs(
     panels: &[Panel],
     freestream: Vec2,
@@ -103,27 +119,33 @@ pub(super) fn assemble_rhs(
     let n = panels.len();
     let size = n + 1;
     let mut rhs = vec![0.0_f32; size];
-    for i in 0..n {
-        let pt = panels[i].mid;
-        let mut phi_src = 0.0_f32;
+
+    for (i, pi) in panels.iter().enumerate() {
+        let colloc = pi.mid + pi.normal * COLLOCATION_OFFSET;
+        let mut src_n = 0.0_f32;
         for pj in panels.iter() {
-            phi_src +=
-                source_potential(pt, pj) * freestream.dot(pj.normal);
+            let sigma = freestream.dot(pj.normal);
+            let (src, _, _) = panel_influence(colloc, pj);
+            src_n += src.dot(pi.normal) * sigma;
         }
-        rhs[i] = -(phi_src + freestream.dot(pt));
+        rhs[i] = -freestream.dot(pi.normal) - src_n;
     }
-    // Kutta rhs = 0
+
+    // Kutta RHS: γ_0 + γ_N = 0 → rhs = 0.
+    rhs[n] = 0.0;
+
     rhs
 }
 
-/// V_t = V∞·t + dμ/ds + source_velocity_tangential.
+/// V_t at each panel from node gammas + prescribed source.
 pub(super) fn tangential_velocities(
     panels: &[Panel],
-    solution: &[f32], // length N+1: [μ_0..μ_{N-1}, μ_wake]
+    tan_infl: &[f32],
+    node_gammas: &[f32],
     freestream: Vec2,
 ) -> Vec<f32> {
     let n = panels.len();
-    let mus = &solution[..n];
+    let size = n + 1;
     let inv_2pi = 1.0 / (2.0 * PI);
     let inv_4pi = 1.0 / (4.0 * PI);
     let mut vt = Vec::with_capacity(n);
@@ -131,23 +153,21 @@ pub(super) fn tangential_velocities(
     for i in 0..n {
         let mut v = freestream.dot(panels[i].tangent);
 
-        // dμ/ds
-        let ip = if i > 0 { i - 1 } else { n - 1 };
-        let in_ = if i + 1 < n { i + 1 } else { 0 };
-        let ds_p = panels[i].mid.distance(panels[ip].mid).max(1e-6);
-        let ds_n = panels[in_].mid.distance(panels[i].mid).max(1e-6);
-        v += 0.5
-            * ((mus[i] - mus[ip]) / ds_p + (mus[in_] - mus[i]) / ds_n);
+        // Vortex tangent from cached tan_infl.
+        for j in 0..node_gammas.len().min(size) {
+            v += tan_infl[i * size + j] * node_gammas[j];
+        }
 
-        // Source velocity tangential component.
-        let pt = panels[i].mid;
+        // Source tangent (computed at runtime since σ depends on freestream).
+        let colloc =
+            panels[i].mid + panels[i].normal * COLLOCATION_OFFSET;
         for pj in panels.iter() {
             let sigma = freestream.dot(pj.normal);
             if sigma.abs() < 1e-10 {
                 continue;
             }
-            let dx = pt.x - pj.start.x;
-            let dy = pt.y - pj.start.y;
+            let dx = colloc.x - pj.start.x;
+            let dy = colloc.y - pj.start.y;
             let xl = dx * pj.tangent.x + dy * pj.tangent.y;
             let yl = dx * pj.normal.x + dy * pj.normal.y;
             let yl = if yl.abs() < 1e-6 {
@@ -170,40 +190,20 @@ pub(super) fn tangential_velocities(
     vt
 }
 
-/// Induced velocity at point (for field viz).
+/// Induced velocity at point (for viz).
 pub(super) fn induced_velocity(
     point: Vec2,
     panels: &[Panel],
-    solution: &[f32],
+    node_gammas: &[f32],
     freestream: Vec2,
 ) -> Vec2 {
-    let n = panels.len();
-    let mus = &solution[..n];
-    let inv_2pi = 1.0 / (2.0 * PI);
-    let inv_4pi = 1.0 / (4.0 * PI);
     let mut vel = Vec2::ZERO;
     for (j, pj) in panels.iter().enumerate() {
-        let dx = point.x - pj.start.x;
-        let dy = point.y - pj.start.y;
-        let xl = dx * pj.tangent.x + dy * pj.tangent.y;
-        let yl = dx * pj.normal.x + dy * pj.normal.y;
-        let yl = if yl.abs() < 1e-6 {
-            if yl >= 0.0 { 1e-6 } else { -1e-6 }
-        } else {
-            yl
-        };
-        let x2 = xl - pj.length;
-        let r1sq = (xl * xl + yl * yl).max(1e-12);
-        let r2sq = (x2 * x2 + yl * yl).max(1e-12);
-        let ln_t = fast_ln(r2sq / r1sq);
-        let at_t = fast_atan2(yl, x2) - fast_atan2(yl, xl);
+        let (src, vl, vr) = panel_influence(point, pj);
         let sigma = freestream.dot(pj.normal);
-        vel += (pj.tangent * (ln_t * inv_4pi)
-            + pj.normal * (at_t * inv_2pi))
-            * sigma;
-        vel += (pj.tangent * (-at_t * inv_2pi)
-            + pj.normal * (ln_t * inv_4pi))
-            * mus[j];
+        vel += src * sigma;
+        let j1 = if j + 1 < node_gammas.len() { j + 1 } else { 0 };
+        vel += vl * node_gammas[j] + vr * node_gammas[j1];
     }
     vel
 }
