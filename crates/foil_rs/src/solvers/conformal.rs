@@ -132,9 +132,9 @@ pub fn solve_conformal(
     // 4. Update θ' = θ + ε and recompute z(θ')
     // 5. Iterate until ε converges
 
-    // Center the contour at the approximate midchord.
-    let x_mid = 0.5;
-    let y_mid = 0.0;
+    // Center at the contour centroid (minimizes radius variation).
+    let x_mid = x_body.iter().sum::<f64>() / n as f64;
+    let y_mid = y_body.iter().sum::<f64>() / n as f64;
     let mut zx: Vec<f64> = x_body.iter().map(|&x| x - x_mid).collect();
     let mut zy: Vec<f64> = y_body.iter().map(|&y| y - y_mid).collect();
 
@@ -209,31 +209,30 @@ pub fn solve_conformal(
         }
     }
 
-    // Step 3: Compute the surface velocity.
-    // q/V∞ = |dζ/dz|⁻¹ at the surface.
-    // For the mapped circle, the complex velocity at angle θ is:
-    //   w(θ) = V∞ · [exp(-iα) - exp(iα) · exp(-2iθ) + iΓ/(2πa)] / (dz/dζ)
+    // Step 3: Surface velocity via the Theodorsen formula.
     //
-    // where dz/dζ is the derivative of the conformal map.
+    // The velocity on the circle (radius a=1) with Kutta at θ=0:
+    //   V_circle(θ) = 2[sin(θ - α) + sin(α + ε₀)]
+    // where ε₀ = ε(0) is the TE angular deviation (zero for symmetric).
     //
-    // The magnitude |dz/dζ| = a · exp(ψ) · sqrt(1 + ε')
-    // approximately, where ε' = dε/dθ.
+    // The conformal map Jacobian:
+    //   |dz/dζ| = exp(ψ) · √(ψ'² + (1+ε')²)
     //
-    // The surface speed:
-    //   q/V∞ = 2·sin(θ + ε + α) / (exp(ψ) · |1 + dε/dθ|)
-    //
-    // The Kutta condition: q = 0 at θ = 0 (trailing edge) →
-    //   Γ/(4πaV∞) = sin(α + ε(0))
+    // Surface speed on the airfoil:
+    //   q(θ)/V∞ = V_circle(θ) / |dz/dζ|
 
     let te_epsilon = epsilon[0];
-    let gamma_term = (alpha_rad + te_epsilon).sin(); // Γ/(4πaV∞)
+    let kutta_circ = (alpha_rad + te_epsilon).sin();
 
-    // Compute dε/dθ by finite differences.
+    // Compute dψ/dθ and dε/dθ by central finite differences.
+    let mut dpsi = vec![0.0_f64; n];
     let mut deps = vec![0.0_f64; n];
     for i in 0..n {
         let ip = (i + 1) % n;
         let im = (i + n - 1) % n;
-        deps[i] = (epsilon[ip] - epsilon[im]) * n as f64 / (4.0 * PI);
+        let dtheta = 2.0 * PI / n as f64;
+        dpsi[i] = (psi[ip] - psi[im]) / (2.0 * dtheta);
+        deps[i] = (epsilon[ip] - epsilon[im]) / (2.0 * dtheta);
     }
 
     let mut v_ratio = Vec::with_capacity(n);
@@ -244,11 +243,22 @@ pub fn solve_conformal(
 
     for i in 0..n {
         let theta_i = 2.0 * PI * i as f64 / n as f64;
-        let numerator = 2.0
-            * ((theta_i + epsilon[i] + alpha_rad).sin() + gamma_term);
-        let denominator = psi[i].exp()
-            * ((1.0 + deps[i]).powi(2) + 0.0).sqrt().max(1e-12);
-        let vr = numerator / denominator;
+
+        // Circle velocity with Kutta:
+        //   V_θ = -2sin(θ-α) - 2sin(α+ε₀)  (Kutta at θ=0)
+        //   q = 2|sin(θ-α) + sin(α+ε₀)|
+        let v_circle = 2.0 * ((theta_i - alpha_rad).sin() + kutta_circ);
+
+        // Map Jacobian: |dz/dζ|/(2πa) normalized.
+        // For thin airfoils exp(ψ) ≈ 1 and 1+ε' ≈ 1.
+        let jacobian = psi[i].exp()
+            * (dpsi[i] * dpsi[i] + (1.0 + deps[i]).powi(2)).sqrt();
+
+        let vr = if jacobian.abs() > 1e-10 {
+            v_circle / jacobian
+        } else {
+            0.0
+        };
 
         v_ratio.push(vr);
         cp.push(1.0 - vr * vr);
@@ -259,7 +269,7 @@ pub fn solve_conformal(
 
     // CL from the Kutta-Joukowski: CL = 2π(sin(α + ε_TE) + sin(α))
     // More precisely: CL = 4π·a·sin(α + ε(0)) / chord ≈ 2π·sin(α + α₀L)
-    let cl = 2.0 * PI * gamma_term; // KJ for unit chord
+    let cl = 2.0 * PI * kutta_circ; // KJ: CL = 2π·sin(α + ε_TE)
     let alpha_0l = -te_epsilon; // zero-lift angle
 
     // CM about c/4 from conformal mapping theory:
