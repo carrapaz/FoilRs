@@ -12,7 +12,10 @@ use bevy::{
     },
 };
 
-use crate::{airfoil::build_naca_body_geometry, state::NacaParams};
+use crate::{
+    airfoil::{build_naca_body_geometry, resolved_surface_point_count},
+    state::NacaParams,
+};
 
 use super::super::config;
 use super::super::types::PanelCountText;
@@ -90,10 +93,19 @@ pub(super) fn spawn_panel_settings(
 }
 
 fn panel_count_label(params: &NacaParams) -> String {
+    let requested_points = params.num_points.max(32);
+    let resolved_points = resolved_surface_point_count(params);
     let total_panels =
         build_naca_body_geometry(params).len().saturating_sub(1);
-    format!(
-        "Points per surface: {}  |  total panels: {}",
-        params.num_points, total_panels
-    )
+    if resolved_points > requested_points {
+        format!(
+            "Points per surface: {} (adaptive {})  |  total panels: {}",
+            requested_points, resolved_points, total_panels
+        )
+    } else {
+        format!(
+            "Points per surface: {}  |  total panels: {}",
+            requested_points, total_panels
+        )
+    }
 }

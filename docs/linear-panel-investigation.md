@@ -224,21 +224,26 @@ as a single panel whose potential is a smooth function, missing the jump.
 
 ### Option C: Use the working constant-strength method + corrections
 
-The current CL 16% / CD 8% / CM 9% with corrections is already usable
+The current CL 11% / CD 8% / CM 7% with corrections is already usable
 for the aircraft builder integration.  The linear panel upgrade can
 happen later as a focused effort.
 
 ## Current state of the code
 
-- **`linear.rs`**: contains all verified influence functions (velocity
-  and potential), the Neumann assembly with prescribed sources, V_t
-  computation with source velocity contribution, and field visualization
-  induced velocity.  Not connected to the active solver.
+- **`linear.rs`**: contains the verified source / constant-vortex /
+  linear-vortex velocity influence functions, the Neumann assembly with
+  prescribed sources, V_t recovery, and field-visualization induced
+  velocity.  The potential / branch-cut wake formulation is **not**
+  present in the checked-in code yet, and the module is not connected to
+  the active solver.
 
-- **`mod.rs`**: unchanged from main — constant-strength Hess-Smith at
-  CL 16% / CD 8% / CM 9%.
+- **`mod.rs`**: still uses the constant-strength Hess-Smith solver, but
+  now relaxes leading-edge clustering for thin sections.  That cut the
+  NACA 0008 validation error from 24.5% CL to 6.1% CL and brought the
+  overall validation mean to roughly CL 11% / CD 8% / CM 7%.
 
-- **All 58 tests pass**, validation unchanged.
+- **All tests pass**, and `cargo val` improved without changing the
+  linear-panel branch-cut work.
 
 ## Recommendation
 

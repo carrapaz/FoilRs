@@ -43,25 +43,30 @@ Abbott & Von Doenhoff reference data.  Run `cargo val` to see current state.
 
 | Metric | NACA 0008 | NACA 0012 | NACA 2412 | NACA 4412 | Overall |
 |---|---|---|---|---|---|
-| CL | 24.5% | 6.3% | 12.4% | 19.3% | **15.6%** |
-| CD | 10.0% | 5.7% | 6.3% | 10.8% | **8.2%** |
-| CM | 14.4% | 13.2% | 7.3% | 2.5% | **9.3%** |
+| CL | 6.1% | 6.3% | 12.4% | 19.3% | **11.0%** |
+| CD | 10.8% | 5.7% | 6.3% | 10.8% | **8.4%** |
+| CM | 5.3% | 13.2% | 7.3% | 2.5% | **7.1%** |
 
 At positive alpha (flight regime), cambered CL is 5-10%.
 
-#### CL: thin airfoil over-prediction (NACA 0008: 24.5%)
+#### CL: thin airfoil spacing sensitivity (NACA 0008: 6.1%)
 
 For t/c < 10%, the constant-strength panels on upper and lower surfaces
 are very close together, and the V_t at collocation points picks up
-near-field artifacts from adjacent panels.  CL_alpha for 0008 is 8.4/rad
-vs reference 6.3/rad.
+near-field artifacts from adjacent panels.  Relaxing the leading-edge
+clustering for thin sections brought NACA 0008 CL_alpha down from 8.4/rad
+to 5.9/rad (reference 6.3/rad), which fixed the worst over-prediction.
 
 **Root cause:** constant-strength panels have velocity discontinuities at
 junctions.  For thin airfoils, these jumps on one surface influence the
 other surface's collocation point.
 
-**Fix:** linear-strength vortex panels (see plan below) and/or adaptive
-panel spacing with more panels for thin sections.
+**Current mitigation:** use less aggressive LE clustering for thin sections
+so the constant-strength solver does not place as many very short panels
+across the nose.
+
+**Remaining fix:** linear-strength vortex panels (see plan below), which
+remove the junction discontinuities instead of merely spacing them out.
 
 #### CL: cambered airfoil residual (2412: 12.4%, 4412: 19.3%)
 

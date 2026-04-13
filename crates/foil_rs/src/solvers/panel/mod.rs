@@ -10,7 +10,7 @@ mod panels;
 
 use geometry::{
     build_naca_body_geometry_sharp_te, camber_line, camber_slope,
-    thickness_distribution,
+    resolved_surface_point_count, thickness_distribution,
 };
 use panels::{Panel, build_panels};
 
@@ -18,7 +18,7 @@ const SURFACE_SAMPLE_EPS: f32 = 1e-4;
 const COLLOCATION_OFFSET: f32 = 1e-4;
 
 fn effective_num_points(params: &NacaParams) -> usize {
-    let n = params.num_points.max(32);
+    let n = resolved_surface_point_count(params);
     if n.is_multiple_of(2) { n } else { n + 1 }
 }
 

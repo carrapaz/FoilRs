@@ -1,6 +1,7 @@
 use foil_rs::airfoil::{
     build_naca_body_geometry, build_naca_body_geometry_sharp_te,
-    camber_line, camber_slope, thickness_distribution,
+    camber_line, camber_slope, resolved_surface_point_count,
+    thickness_distribution,
 };
 use foil_rs::solvers::panel::{
     PanelLuSystem, approx_section_coeffs, compute_panel_solution,
@@ -126,6 +127,23 @@ fn naca0012_cl_alpha_matches_thin_airfoil_theory() {
     assert!(
         (cl_alpha - two_pi).abs() / two_pi < 0.08,
         "CL_alpha={:.3} should be near 2*pi={:.3}",
+        cl_alpha,
+        two_pi
+    );
+}
+
+#[test]
+fn naca0008_cl_alpha_is_not_overpredicted_for_thin_airfoil() {
+    let params = NacaParams::from_naca4("0008").expect("parse");
+    let system = PanelLuSystem::new(&params).expect("LU system");
+    let cl_2 = system.panel_solution(&params, 2.0).cl().unwrap_or(0.0);
+    let cl_neg2 =
+        system.panel_solution(&params, -2.0).cl().unwrap_or(0.0);
+    let cl_alpha = (cl_2 - cl_neg2) / (4.0_f32.to_radians());
+    let two_pi = 2.0 * std::f32::consts::PI;
+    assert!(
+        (cl_alpha - two_pi).abs() / two_pi < 0.12,
+        "thin-airfoil CL_alpha={:.3} should stay close to 2*pi={:.3}",
         cl_alpha,
         two_pi
     );
@@ -750,6 +768,32 @@ fn rounded_te_has_more_points_than_sharp() {
         "rounded TE should have >= points: sharp={} round={}",
         sharp.len(),
         round.len()
+    );
+}
+
+#[test]
+fn thin_airfoils_relax_le_clustering() {
+    let thin = NacaParams::from_naca4("0008").expect("parse");
+    let baseline = NacaParams::from_naca4("0012").expect("parse");
+    assert_eq!(resolved_surface_point_count(&thin), thin.num_points);
+    assert_eq!(
+        resolved_surface_point_count(&baseline),
+        baseline.num_points
+    );
+
+    let thin_pts = build_naca_body_geometry_sharp_te(&thin);
+    let baseline_pts = build_naca_body_geometry_sharp_te(&baseline);
+    let first_positive_x = |pts: &[foil_rs::math::Vec2]| {
+        pts.iter()
+            .map(|p| p.x)
+            .filter(|x| *x > 1e-4)
+            .min_by(|a, b| a.total_cmp(b))
+            .unwrap_or(0.0)
+    };
+
+    assert!(
+        first_positive_x(&thin_pts) > first_positive_x(&baseline_pts),
+        "expected thinner section to spread points away from the LE"
     );
 }
 

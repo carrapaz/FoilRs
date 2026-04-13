@@ -368,14 +368,24 @@ pub fn update_panel_count_text(
     if !params.is_changed() {
         return;
     }
+    let requested_points = params.num_points.max(32);
+    let resolved_points =
+        crate::airfoil::resolved_surface_point_count(&params);
     let total_panels =
         crate::airfoil::build_naca_body_geometry(&params)
             .len()
             .saturating_sub(1);
-    let label = format!(
-        "Points per surface: {}  |  total panels: {}",
-        params.num_points, total_panels
-    );
+    let label = if resolved_points > requested_points {
+        format!(
+            "Points per surface: {} (adaptive {})  |  total panels: {}",
+            requested_points, resolved_points, total_panels
+        )
+    } else {
+        format!(
+            "Points per surface: {}  |  total panels: {}",
+            requested_points, total_panels
+        )
+    };
     for mut text in &mut texts {
         text.0 = label.clone();
     }

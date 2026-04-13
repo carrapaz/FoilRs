@@ -3,6 +3,34 @@ use std::f32::consts::PI;
 use crate::math::Vec2;
 use crate::state::NacaParams;
 
+const MIN_SURFACE_POINTS: usize = 32;
+const ADAPTIVE_REFERENCE_THICKNESS: f32 = 0.12;
+
+/// Resolve the point count used to sample one airfoil surface.
+///
+/// Thin sections benefit more from spacing changes than raw panel-count
+/// increases, so the requested count remains authoritative here.
+pub fn resolved_surface_point_count(params: &NacaParams) -> usize {
+    params.num_points.max(MIN_SURFACE_POINTS)
+}
+
+fn le_clustering_exponent(params: &NacaParams) -> f32 {
+    let thinness =
+        ((ADAPTIVE_REFERENCE_THICKNESS - params.t()) / 0.08)
+            .clamp(0.0, 1.0);
+    (1.0 - 0.35 * thinness).clamp(0.7, 1.0)
+}
+
+fn adaptive_cosine_spacing(n: usize, le_exponent: f32) -> Vec<f32> {
+    (0..n)
+        .map(|i| {
+            let beta = i as f32 / (n.saturating_sub(1)).max(1) as f32;
+            let beta = beta.powf(le_exponent);
+            0.5 * (1.0 - (PI * beta).cos())
+        })
+        .collect()
+}
+
 /// Build NACA 4-digit geometry in body coordinates as a closed loop.
 ///
 /// Ordering: starts at the trailing edge, goes along the lower surface to the
@@ -12,15 +40,16 @@ pub fn build_naca_body_geometry(params: &NacaParams) -> Vec<Vec2> {
     let m = params.m();
     let p = params.p();
     let t = params.t();
-    let n = params.num_points.max(32);
+    let n = resolved_surface_point_count(params);
+    let x_stations =
+        adaptive_cosine_spacing(n, le_clustering_exponent(params));
 
     let mut upper: Vec<Vec2> = Vec::with_capacity(n);
     let mut lower: Vec<Vec2> = Vec::with_capacity(n);
     let mut full: Vec<Vec2> = Vec::with_capacity(2 * n);
 
     for i in (0..n).rev() {
-        let beta = i as f32 / (n - 1) as f32;
-        let x_c = 0.5 * (1.0 - (PI * beta).cos());
+        let x_c = x_stations[i];
 
         let camber = camber_line(m, p, x_c);
         let slope = camber_slope(m, p, x_c);
@@ -34,8 +63,7 @@ pub fn build_naca_body_geometry(params: &NacaParams) -> Vec<Vec2> {
     }
 
     for i in 0..n {
-        let beta = i as f32 / (n - 1) as f32;
-        let x_c = 0.5 * (1.0 - (PI * beta).cos());
+        let x_c = x_stations[i];
 
         let camber = camber_line(m, p, x_c);
         let slope = camber_slope(m, p, x_c);
@@ -110,15 +138,16 @@ pub fn build_naca_body_geometry_sharp_te(
     let m = params.m();
     let p = params.p();
     let t = params.t();
-    let n = params.num_points.max(32);
+    let n = resolved_surface_point_count(params);
+    let x_stations =
+        adaptive_cosine_spacing(n, le_clustering_exponent(params));
 
     let mut upper: Vec<Vec2> = Vec::with_capacity(n);
     let mut lower: Vec<Vec2> = Vec::with_capacity(n);
     let mut full: Vec<Vec2> = Vec::with_capacity(2 * n + 1);
 
     for i in (0..n).rev() {
-        let beta = i as f32 / (n - 1) as f32;
-        let x_c = 0.5 * (1.0 - (PI * beta).cos());
+        let x_c = x_stations[i];
 
         let camber = camber_line(m, p, x_c);
         let slope = camber_slope(m, p, x_c);
@@ -132,8 +161,7 @@ pub fn build_naca_body_geometry_sharp_te(
     }
 
     for i in 0..n {
-        let beta = i as f32 / (n - 1) as f32;
-        let x_c = 0.5 * (1.0 - (PI * beta).cos());
+        let x_c = x_stations[i];
 
         let camber = camber_line(m, p, x_c);
         let slope = camber_slope(m, p, x_c);
