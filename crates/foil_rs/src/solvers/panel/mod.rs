@@ -6,6 +6,7 @@ use crate::state::{FlowSettings, NacaParams};
 use super::boundary_layer::{self, BoundaryLayerInputs};
 
 mod geometry;
+pub(crate) mod linear;
 mod panels;
 
 use geometry::{
@@ -151,7 +152,7 @@ fn integrate_cm_c4_from_cp(
 
 pub struct PanelLuSystem {
     panels: Vec<Panel>,
-    lu: Vec<f32>,
+    lu: Vec<f64>,
     pivots: Vec<usize>,
     size: usize,
     upper_dir: Vec2,
@@ -182,11 +183,11 @@ pub struct PanelFlow<'a> {
 impl PanelFlow<'_> {
     pub fn velocity_body_pg(&self, point: Vec2, mach: f32) -> Vec2 {
         let beta = (1.0 - mach * mach).clamp(0.05, 1.0).sqrt();
-        let induced = induced_velocity_from_solution(
+        let induced = linear::induced_velocity(
             point,
             self.panels,
             &self.sources,
-            self.gamma,
+            self.freestream,
         );
         self.freestream + induced / beta
     }
@@ -202,51 +203,34 @@ impl PanelLuSystem {
             return None;
         }
 
-        let (
-            matrix,
-            tan_infl,
-            vort_tan_self,
-            size,
-            upper_dir,
-            lower_dir,
-        ) = assemble_matrix(&panels);
-        let (lu, pivots) = lu_factorize(&matrix, size)?;
+        // Constant-doublet Dirichlet formulation.
+        let (te_upper, te_lower) = linear::te_panel_indices(&panels);
+        let (matrix_f32, size) =
+            linear::assemble(&panels, te_upper, te_lower);
+        // Promote to f64 for the LU solve — the Dirichlet formulation
+        // requires resolving small perturbations (~7%) on large base
+        // doublet values, which exceeds f32 precision.
+        let matrix_f64: Vec<f64> =
+            matrix_f32.iter().map(|&v| v as f64).collect();
+        let (lu_f64, pivots) = lu_factorize_f64(&matrix_f64, size)?;
+        // Store as f64 for the solve.
+        let lu = lu_f64;
 
-        let mut sys = Self {
+        let (upper_idx, lower_idx) = kutta_te_panel_indices(&panels);
+        let upper_dir = panels[upper_idx].tangent;
+        let lower_dir = -panels[lower_idx].tangent;
+
+        Some(Self {
             panels,
             lu,
             pivots,
             size,
             upper_dir,
             lower_dir,
-            tan_infl,
-            vort_tan_self,
+            tan_infl: Vec::new(),
+            vort_tan_self: Vec::new(),
             cl_0_correction: 0.0,
-        };
-
-        // Compute CL_0 correction: the panel method under-predicts
-        // the camber-induced CL_0 due to collocation-offset bias.
-        // The thin-airfoil theory gives an accurate CL_0 reference.
-        if local.m() > 1e-4 {
-            let alpha_0l_theory = thin_airfoil_zero_lift_alpha(&local);
-            // CL_0 from thin-airfoil: CL_0 = cl_alpha_2D * |alpha_0L|
-            // where cl_alpha_2D ≈ 2π (exact for thin airfoils).
-            let cl_0_theory = 2.0 * PI * alpha_0l_theory.abs();
-            // CL_0 from the panel solver at alpha=0:
-            let freestream_0 = Vec2::new(1.0, 0.0);
-            let cl_0_panel = if let Some((src, gam)) =
-                sys.solve(freestream_0)
-            {
-                let vt =
-                    sys.tangential_velocities(&src, gam, freestream_0);
-                surface_cp_from_panels(&sys.panels, &vt, &local).cl
-            } else {
-                0.0
-            };
-            sys.cl_0_correction = cl_0_theory - cl_0_panel;
-        }
-
-        Some(sys)
+        })
     }
 
     pub fn solve_flow(&self, alpha_deg: f32) -> Option<PanelFlow<'_>> {
@@ -278,29 +262,23 @@ impl PanelLuSystem {
         freestream: Vec2,
         transpiration: Option<&[f32]>,
     ) -> Option<(Vec<f32>, f32)> {
-        let mut rhs = assemble_rhs(
-            &self.panels,
-            freestream,
-            self.upper_dir,
-            self.lower_dir,
-        );
-        // Add transpiration (displacement-thickness outflow) to the
-        // normal-velocity boundary condition.
+        let mut rhs_f32 =
+            linear::assemble_rhs(&self.panels, freestream);
         if let Some(vn) = transpiration {
             let n = self.panels.len().min(vn.len());
             for i in 0..n {
-                rhs[i] += vn[i];
+                rhs_f32[i] += vn[i];
             }
         }
-        let strengths =
-            lu_solve(&self.lu, &self.pivots, &rhs, self.size)?;
-        if strengths.len() != self.size {
+        let rhs_f64: Vec<f64> =
+            rhs_f32.iter().map(|&v| v as f64).collect();
+        let mus_f64 =
+            lu_solve_f64(&self.lu, &self.pivots, &rhs_f64, self.size)?;
+        let mus: Vec<f32> = mus_f64.iter().map(|&v| v as f32).collect();
+        if mus.len() != self.size {
             return None;
         }
-        let n_panels = self.panels.len();
-        let gamma = strengths[n_panels];
-        let sources = strengths[..n_panels].to_vec();
-        Some((sources, gamma))
+        Some((mus, 0.0))
     }
 
     /// Recover tangential velocity at each panel surface from the solved
@@ -313,44 +291,14 @@ impl PanelLuSystem {
     /// induce equal and opposite tangential velocities at the center).
     /// The cached coefficients are evaluated at the collocation offset
     /// point where the self-influence is non-zero — this introduces a
-    /// systematic bias that grows with camber.  The correction zeros
-    /// out the self-influence diagonal.
-    /// Recover tangential velocity at each panel surface from the solved
-    /// source/vortex strengths.
-    ///
-    /// Uses the cached tangent influence matrix with a vortex
-    /// self-influence correction.
-    ///
-    /// **Source panels:** V_t is continuous across the panel surface —
-    /// the collocation-offset value equals the surface value.  No
-    /// correction needed.
-    ///
-    /// **Vortex sheet:** V_t has a jump of γ across the surface.  The
-    /// collocation point is on the outside (positive-normal side), so
-    /// V_t(colloc) = V_t(surface) + γ/2.  The surface value is
-    /// V_t(surface) = V_t(colloc) - γ/2.  We apply this correction
-    /// to the vortex self-influence only.
+    /// V_t from doublet gradient: V_t = dμ/ds + V∞·t
     fn tangential_velocities(
         &self,
-        sources: &[f32],
-        gamma: f32,
+        mus: &[f32],
+        _unused: f32,
         freestream: Vec2,
     ) -> Vec<f32> {
-        let n = self.panels.len();
-        let size = self.size;
-        let mut vt = Vec::with_capacity(n);
-        for i in 0..n {
-            let mut v_induced_t = 0.0;
-            // Source: no correction needed (V_t continuous).
-            for (j, &sigma) in sources.iter().enumerate() {
-                v_induced_t += self.tan_infl[i * size + j] * sigma;
-            }
-            v_induced_t += self.tan_infl[i * size + n] * gamma;
-
-            let v_freestream_t = freestream.dot(self.panels[i].tangent);
-            vt.push(v_freestream_t + v_induced_t);
-        }
-        vt
+        linear::tangential_velocities(&self.panels, mus, freestream)
     }
 
     pub fn panel_solution(
@@ -1259,6 +1207,85 @@ fn lu_solve(
         x[i] = sum / diag;
     }
 
+    Some(x)
+}
+
+// ---- f64 LU for Dirichlet formulation (needs double precision) ----
+
+fn lu_factorize_f64(
+    matrix: &[f64],
+    n: usize,
+) -> Option<(Vec<f64>, Vec<usize>)> {
+    let mut lu = matrix.to_vec();
+    let mut pivots: Vec<usize> = (0..n).collect();
+    for k in 0..n {
+        let mut pivot_row = k;
+        let mut pivot_val = lu[k * n + k].abs();
+        for i in (k + 1)..n {
+            let val = lu[i * n + k].abs();
+            if val > pivot_val {
+                pivot_val = val;
+                pivot_row = i;
+            }
+        }
+        if pivot_val < 1e-20 {
+            return None;
+        }
+        if pivot_row != k {
+            for col in 0..n {
+                lu.swap(k * n + col, pivot_row * n + col);
+            }
+            pivots.swap(k, pivot_row);
+        }
+        let pivot = lu[k * n + k];
+        if pivot.abs() < 1e-24 {
+            return None;
+        }
+        for i in (k + 1)..n {
+            lu[i * n + k] /= pivot;
+            let lik = lu[i * n + k];
+            if lik.abs() < 1e-24 {
+                continue;
+            }
+            for j in (k + 1)..n {
+                lu[i * n + j] -= lik * lu[k * n + j];
+            }
+        }
+    }
+    Some((lu, pivots))
+}
+
+fn lu_solve_f64(
+    lu: &[f64],
+    pivots: &[usize],
+    rhs: &[f64],
+    n: usize,
+) -> Option<Vec<f64>> {
+    if rhs.len() != n || pivots.len() != n || lu.len() != n * n {
+        return None;
+    }
+    let mut x = vec![0.0_f64; n];
+    for i in 0..n {
+        x[i] = rhs[pivots[i]];
+    }
+    for i in 1..n {
+        let mut sum = x[i];
+        for j in 0..i {
+            sum -= lu[i * n + j] * x[j];
+        }
+        x[i] = sum;
+    }
+    for i in (0..n).rev() {
+        let mut sum = x[i];
+        for j in (i + 1)..n {
+            sum -= lu[i * n + j] * x[j];
+        }
+        let diag = lu[i * n + i];
+        if diag.abs() < 1e-24 {
+            return None;
+        }
+        x[i] = sum / diag;
+    }
     Some(x)
 }
 
