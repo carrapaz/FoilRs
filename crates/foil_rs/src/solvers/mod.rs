@@ -1,4 +1,5 @@
 pub mod boundary_layer;
+pub mod conformal;
 pub mod panel;
 pub mod polar;
 
