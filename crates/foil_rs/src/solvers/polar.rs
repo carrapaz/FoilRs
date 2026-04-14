@@ -127,11 +127,8 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
             }
         };
 
-        let (m, p, t) = (
-            params.m() as f64,
-            params.p() as f64,
-            params.t() as f64,
-        );
+        let (m, p, t) =
+            (params.m() as f64, params.p() as f64, params.t() as f64);
 
         let mut rows = Vec::with_capacity(capacity);
         for &a in &alphas {

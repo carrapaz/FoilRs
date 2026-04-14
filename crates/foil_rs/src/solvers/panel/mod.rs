@@ -170,6 +170,11 @@ pub struct PanelLuSystem {
     /// and the panel solver's CL_0 at alpha=0.  Added to all CL values
     /// to compensate for the collocation-offset camber bias.
     cl_0_correction: f32,
+    /// CL slope correction factor: ratio of theoretical CL_alpha (2π)
+    /// to the panel solver's CL_alpha.  Compensates for the panel
+    /// method's CL over-prediction on thin airfoils where the
+    /// influence matrix becomes ill-conditioned.
+    cl_slope_correction: f32,
 }
 
 pub struct PanelFlow<'a> {
@@ -222,17 +227,54 @@ impl PanelLuSystem {
             tan_infl,
             vort_tan_self,
             cl_0_correction: 0.0,
+            cl_slope_correction: 1.0,
         };
+
+        // Compute CL slope correction: the panel method over-predicts
+        // CL_alpha for thin airfoils due to ill-conditioning of the
+        // influence matrix when upper/lower surfaces are close.
+        // Compare the panel CL_alpha to thin-airfoil theory (2π).
+        {
+            let alpha_probe = 3.0_f32.to_radians();
+            let fs_pos =
+                Vec2::new(alpha_probe.cos(), alpha_probe.sin());
+            let fs_neg =
+                Vec2::new(alpha_probe.cos(), -alpha_probe.sin());
+            let cl_pos = sys
+                .solve(fs_pos)
+                .map(|(src, gam)| {
+                    let vt =
+                        sys.tangential_velocities(&src, gam, fs_pos);
+                    surface_cp_from_panels(&sys.panels, &vt, &local).cl
+                })
+                .unwrap_or(0.0);
+            let cl_neg = sys
+                .solve(fs_neg)
+                .map(|(src, gam)| {
+                    let vt =
+                        sys.tangential_velocities(&src, gam, fs_neg);
+                    surface_cp_from_panels(&sys.panels, &vt, &local).cl
+                })
+                .unwrap_or(0.0);
+            let cl_alpha_panel =
+                (cl_pos - cl_neg) / (2.0 * alpha_probe);
+            if cl_alpha_panel.abs() > 1.0 {
+                sys.cl_slope_correction =
+                    (2.0 * PI / cl_alpha_panel).clamp(0.5, 1.5);
+            }
+        }
 
         // Compute CL_0 correction: the panel method under-predicts
         // the camber-induced CL_0 due to collocation-offset bias.
         // The thin-airfoil theory gives an accurate CL_0 reference.
+        // Applied after slope correction so the two don't double-count.
         if local.m() > 1e-4 {
             let alpha_0l_theory = thin_airfoil_zero_lift_alpha(&local);
             // CL_0 from thin-airfoil: CL_0 = cl_alpha_2D * |alpha_0L|
             // where cl_alpha_2D ≈ 2π (exact for thin airfoils).
             let cl_0_theory = 2.0 * PI * alpha_0l_theory.abs();
-            // CL_0 from the panel solver at alpha=0:
+            // CL_0 from the panel solver at alpha=0 (with slope
+            // correction applied):
             let freestream_0 = Vec2::new(1.0, 0.0);
             let cl_0_panel = if let Some((src, gam)) =
                 sys.solve(freestream_0)
@@ -240,6 +282,7 @@ impl PanelLuSystem {
                 let vt =
                     sys.tangential_velocities(&src, gam, freestream_0);
                 surface_cp_from_panels(&sys.panels, &vt, &local).cl
+                    * sys.cl_slope_correction
             } else {
                 0.0
             };
@@ -386,7 +429,8 @@ impl PanelLuSystem {
         // airfoils.
         let scp = surface_cp_from_panels(&self.panels, &vt, params);
         let scp = SurfaceCpResult {
-            cl: scp.cl + self.cl_0_correction,
+            cl: scp.cl * self.cl_slope_correction
+                + self.cl_0_correction,
             cm_c4: scp.cm_c4,
         };
 
@@ -396,8 +440,7 @@ impl PanelLuSystem {
         // Build Cp from on-surface V_t at panel collocation points.
         // This is the physically correct panel-method output — no
         // off-surface sampling artifacts that blow up the BL at high Re.
-        let cp_sol =
-            cp_from_surface_vt(&self.panels, &vt, &local);
+        let cp_sol = cp_from_surface_vt(&self.panels, &vt, &local);
 
         let (cl_approx, cm_approx, _) =
             approx_section_coeffs(params, alpha_deg);
@@ -600,7 +643,8 @@ impl PanelLuSystem {
         let vt =
             self.tangential_velocities(&sources, gamma, freestream);
         let scp = surface_cp_from_panels(&self.panels, &vt, params);
-        let cl = scp.cl + self.cl_0_correction;
+        let cl =
+            scp.cl * self.cl_slope_correction + self.cl_0_correction;
 
         let mut local = params.clone();
         local.num_points = effective_num_points(params);
@@ -954,12 +998,10 @@ fn cp_from_surface_vt(
         .collect();
     upper_data.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-    let mut lower_data: Vec<(f32, f32, Vec2)> =
-        (le_idx + 1..panels.len())
-            .map(|i| {
-                (panels[i].mid.x, 1.0 - vt[i] * vt[i], panels[i].mid)
-            })
-            .collect();
+    let mut lower_data: Vec<(f32, f32, Vec2)> = (le_idx + 1
+        ..panels.len())
+        .map(|i| (panels[i].mid.x, 1.0 - vt[i] * vt[i], panels[i].mid))
+        .collect();
     lower_data.sort_by(|a, b| a.0.total_cmp(&b.0));
 
     // Interpolate to cosine-spaced x stations.

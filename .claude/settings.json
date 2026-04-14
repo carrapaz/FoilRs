@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat)",
+      "Bash(rustc /tmp/debug_conformal3.rs -o /tmp/debug_conformal3)",
+      "Bash(/tmp/debug_conformal3)",
+      "Bash(sed -i '' 's/alpha_deg, label/alpha_deg, label\\): \\(f64, f64, f64, f64, \\\\&str\\)/' /tmp/debug_conformal4.rs)",
+      "Bash(rustc /tmp/debug_conformal4.rs -o /tmp/debug_conformal4)",
+      "Bash(/tmp/debug_conformal4)",
+      "Bash(python3)"
+    ]
+  }
+}
