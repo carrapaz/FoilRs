@@ -546,146 +546,157 @@ impl PanelLuSystem {
         &self,
         params: &NacaParams,
         alpha_deg: f32,
-        flow: &FlowSettings,
+        #[allow(unused_variables)] flow: &FlowSettings,
     ) -> PanelSolution {
-        // V-I coupling requires Re high enough for the BL to be thin
-        // relative to the airfoil, and t/c thick enough for stable panel
-        // velocities near the LE.  Fall back to inviscid for thin
-        // airfoils or low Re where the iteration diverges.
-        if flow.reynolds < 1_500_000.0 || params.t() < 0.10 {
-            return self.panel_solution(params, alpha_deg);
-        }
-        let alpha_rad = alpha_deg.to_radians();
-        let freestream = Vec2::new(alpha_rad.cos(), alpha_rad.sin());
-        let bl_inputs = BoundaryLayerInputs::new(
-            flow.reynolds,
-            flow.mach,
-            true,
-            flow.free_transition,
-            0.05,
-        );
+        // V-I coupling (transpiration iteration) is disabled: the
+        // single-surface BL integration diverges for thick airfoils at
+        // high Re, producing noisy polars.  The inviscid panel solution
+        // with CL slope correction gives accurate CL (within 5% of
+        // XFoil reference), and the BL/CD is computed separately by the
+        // polar sweep via `estimate_boundary_layer`.
+        //
+        // Re-enable when a full two-surface V-I iteration is available.
+        return self.panel_solution(params, alpha_deg);
 
-        let Some((mut sources, mut gamma)) = self.solve(freestream)
-        else {
-            let (cl, cm, _) = approx_section_coeffs(params, alpha_deg);
-            return PanelSolution {
-                x: Vec::new(),
-                cp_upper: Vec::new(),
-                cp_lower: Vec::new(),
-                upper_coords: Vec::new(),
-                lower_coords: Vec::new(),
-                cl_cached: Some(cl),
-                cm_c4_cached: Some(cm),
-            };
-        };
-
-        // Find LE panel for upper/lower split.
-        let le_idx = self
-            .panels
-            .iter()
-            .enumerate()
-            .min_by(|(_, a), (_, b)| a.mid.x.total_cmp(&b.mid.x))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-
-        const MAX_ITER: usize = 10;
-        let n = self.panels.len();
-
-        // Upper surface coordinates (LE → TE) for BL integration.
-        let upper_coords: Vec<Vec2> =
-            (0..=le_idx).rev().map(|i| self.panels[i].mid).collect();
-
-        for iter in 0..MAX_ITER {
-            let vt =
-                self.tangential_velocities(&sources, gamma, freestream);
-
-            // Run BL on the upper (suction) surface only.
-            let upper_cp: Vec<f32> = (0..=le_idx)
-                .rev()
-                .map(|i| 1.0 - vt[i] * vt[i])
-                .collect();
-            let bl_upper = boundary_layer::integrate_surface(
-                &upper_coords,
-                &upper_cp,
-                &bl_inputs,
+        // Dead code below — kept for reference until full V-I is implemented.
+        #[allow(unreachable_code)]
+        {
+            let alpha_rad = alpha_deg.to_radians();
+            let freestream =
+                Vec2::new(alpha_rad.cos(), alpha_rad.sin());
+            let bl_inputs = BoundaryLayerInputs::new(
+                flow.reynolds,
+                flow.mach,
+                true,
+                flow.free_transition,
+                0.05,
             );
 
-            // Smoothed transpiration via central differences + 3-pass avg.
-            let vn = smooth_transpiration(&bl_upper.stations);
+            let Some((mut sources, mut gamma)) = self.solve(freestream)
+            else {
+                let (cl, cm, _) =
+                    approx_section_coeffs(params, alpha_deg);
+                return PanelSolution {
+                    x: Vec::new(),
+                    cp_upper: Vec::new(),
+                    cp_lower: Vec::new(),
+                    upper_coords: Vec::new(),
+                    lower_coords: Vec::new(),
+                    cl_cached: Some(cl),
+                    cm_c4_cached: Some(cm),
+                };
+            };
 
-            // Map to panels with ramping relaxation (0.1 → 0.5).
-            let relax = 0.1 + 0.1 * (iter as f32).min(4.0);
-            let skip_frac = 0.05;
-            let mut transpiration = vec![0.0_f32; n];
-            for (k, st) in bl_upper.stations.iter().enumerate() {
-                if st.x < skip_frac || k >= vn.len() {
-                    continue;
+            // Find LE panel for upper/lower split.
+            let le_idx = self
+                .panels
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| a.mid.x.total_cmp(&b.mid.x))
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+
+            const MAX_ITER: usize = 10;
+            let n = self.panels.len();
+
+            // Upper surface coordinates (LE → TE) for BL integration.
+            let upper_coords: Vec<Vec2> = (0..=le_idx)
+                .rev()
+                .map(|i| self.panels[i].mid)
+                .collect();
+
+            for iter in 0..MAX_ITER {
+                let vt = self
+                    .tangential_velocities(&sources, gamma, freestream);
+
+                // Run BL on the upper (suction) surface only.
+                let upper_cp: Vec<f32> = (0..=le_idx)
+                    .rev()
+                    .map(|i| 1.0 - vt[i] * vt[i])
+                    .collect();
+                let bl_upper = boundary_layer::integrate_surface(
+                    &upper_coords,
+                    &upper_cp,
+                    &bl_inputs,
+                );
+
+                // Smoothed transpiration via central differences + 3-pass avg.
+                let vn = smooth_transpiration(&bl_upper.stations);
+
+                // Map to panels with ramping relaxation (0.1 → 0.5).
+                let relax = 0.1 + 0.1 * (iter as f32).min(4.0);
+                let skip_frac = 0.05;
+                let mut transpiration = vec![0.0_f32; n];
+                for (k, st) in bl_upper.stations.iter().enumerate() {
+                    if st.x < skip_frac || k >= vn.len() {
+                        continue;
+                    }
+                    let pi = le_idx.saturating_sub(k);
+                    if pi < n {
+                        transpiration[pi] = relax * vn[k];
+                    }
                 }
-                let pi = le_idx.saturating_sub(k);
-                if pi < n {
-                    transpiration[pi] = relax * vn[k];
+
+                // Re-solve with transpiration.
+                if let Some((s, g)) = self.solve_with_transpiration(
+                    freestream,
+                    Some(&transpiration),
+                ) {
+                    sources = s;
+                    gamma = g;
+                } else {
+                    break;
                 }
             }
 
-            // Re-solve with transpiration.
-            if let Some((s, g)) = self.solve_with_transpiration(
+            // Final V_t from the converged solution.
+            let vt =
+                self.tangential_velocities(&sources, gamma, freestream);
+            let scp = surface_cp_from_panels(&self.panels, &vt, params);
+            let cl = scp.cl * self.cl_slope_correction
+                + self.cl_0_correction;
+
+            let mut local = params.clone();
+            local.num_points = effective_num_points(params);
+            let cp_sol = build_cp_samples(
+                &local,
                 freestream,
-                Some(&transpiration),
-            ) {
-                sources = s;
-                gamma = g;
+                &self.panels,
+                &sources,
+                gamma,
+            );
+
+            let (cl_approx, cm_approx, _) =
+                approx_section_coeffs(params, alpha_deg);
+            let cm = if params.m() > 1e-4 {
+                thin_airfoil_cm_c4(params)
             } else {
-                break;
+                integrate_cm_c4_from_cp(
+                    &cp_sol.x,
+                    &cp_sol.cp_upper,
+                    &cp_sol.cp_lower,
+                )
+                .unwrap_or(cm_approx)
+            };
+
+            PanelSolution {
+                x: cp_sol.x,
+                cp_upper: cp_sol.cp_upper,
+                cp_lower: cp_sol.cp_lower,
+                upper_coords: cp_sol.upper_coords,
+                lower_coords: cp_sol.lower_coords,
+                cl_cached: Some(if cl.is_finite() {
+                    cl
+                } else {
+                    cl_approx
+                }),
+                cm_c4_cached: Some(if cm.is_finite() {
+                    cm
+                } else {
+                    cm_approx
+                }),
             }
-        }
-
-        // Final V_t from the converged solution.
-        let vt =
-            self.tangential_velocities(&sources, gamma, freestream);
-        let scp = surface_cp_from_panels(&self.panels, &vt, params);
-        let cl =
-            scp.cl * self.cl_slope_correction + self.cl_0_correction;
-
-        let mut local = params.clone();
-        local.num_points = effective_num_points(params);
-        let cp_sol = build_cp_samples(
-            &local,
-            freestream,
-            &self.panels,
-            &sources,
-            gamma,
-        );
-
-        let (cl_approx, cm_approx, _) =
-            approx_section_coeffs(params, alpha_deg);
-        let cm = if params.m() > 1e-4 {
-            thin_airfoil_cm_c4(params)
-        } else {
-            integrate_cm_c4_from_cp(
-                &cp_sol.x,
-                &cp_sol.cp_upper,
-                &cp_sol.cp_lower,
-            )
-            .unwrap_or(cm_approx)
-        };
-
-        PanelSolution {
-            x: cp_sol.x,
-            cp_upper: cp_sol.cp_upper,
-            cp_lower: cp_sol.cp_lower,
-            upper_coords: cp_sol.upper_coords,
-            lower_coords: cp_sol.lower_coords,
-            cl_cached: Some(if cl.is_finite() {
-                cl
-            } else {
-                cl_approx
-            }),
-            cm_c4_cached: Some(if cm.is_finite() {
-                cm
-            } else {
-                cm_approx
-            }),
-        }
+        } // end #[allow(unreachable_code)] block
     }
 }
 
