@@ -219,10 +219,13 @@ fn camber_slope(m: f64, p: f64, x: f64) -> f64 {
 }
 
 fn thickness(t: f64, x: f64) -> f64 {
+    // Use closed-TE coefficients (y_t(1) = 0) for a smooth conformal
+    // map.  The standard NACA coefficients leave a 0.13% gap at the TE,
+    // which creates a ψ discontinuity and Cp spike.
     t / 0.2
         * (0.2969 * x.sqrt() - 0.1260 * x - 0.3516 * x * x
             + 0.2843 * x.powi(3)
-            - 0.1015 * x.powi(4))
+            - 0.1036 * x.powi(4))
 }
 
 fn thin_airfoil_cm(m: f64, p: f64) -> f64 {

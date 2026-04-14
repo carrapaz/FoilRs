@@ -1,53 +1,44 @@
 use foil_rs::solvers::theodorsen::solve_theodorsen;
 
 fn main() {
-    println!("=== Accuracy Summary ===\n");
-
-    // Symmetric
-    for alpha in [0.0_f64, 2.0, 4.0, 6.0, 8.0] {
-        let r = solve_theodorsen(
-            0.0,
-            0.0,
-            0.12,
-            alpha.to_radians(),
-            256,
-        );
+    println!("=== NACA 0012 α=4° Cp ===");
+    let r = solve_theodorsen(0.0, 0.0, 0.12, 4.0_f64.to_radians(), 200);
+    println!("CL={:.4} (ref 0.433)", r.cl);
+    println!("x\t\ty\t\tv/V\t\tCp");
+    for i in (0..r.x.len()).step_by(5) {
         println!(
-            "NACA 0012 α={:2}°: CL={:+.4} ε_T={:+.4}° iters={}",
-            alpha,
-            r.cl,
-            r.epsilon_t.to_degrees(),
-            r.iterations
+            "{:.4}\t\t{:+.4}\t\t{:.4}\t\t{:+.4}",
+            r.x[i], r.y[i], r.v_ratio[i], r.cp[i]
         );
     }
 
-    println!();
-
-    // Cambered
-    for (name, m, p) in
-        [("2412", 0.02, 0.4), ("4412", 0.04, 0.4)]
-    {
-        for alpha in [0.0_f64, 2.0, 4.0] {
-            let r = solve_theodorsen(
-                m,
-                p,
-                0.12,
-                alpha.to_radians(),
-                256,
-            );
-            println!(
-                "NACA {} α={:2}°: CL={:+.4} ε_T={:+.4}° CM={:+.4} iters={}",
-                name, alpha, r.cl, r.epsilon_t.to_degrees(), r.cm_c4, r.iterations
-            );
-        }
-        println!();
+    println!("\n=== NACA 2412 α=0° Cp ===");
+    let r = solve_theodorsen(0.02, 0.4, 0.12, 0.0, 200);
+    println!("CL={:.4} (ref 0.23), CM={:.4} (ref -0.053)", r.cl, r.cm_c4);
+    println!("x\t\ty\t\tv/V\t\tCp");
+    for i in (0..r.x.len()).step_by(5) {
+        println!(
+            "{:.4}\t\t{:+.4}\t\t{:.4}\t\t{:+.4}",
+            r.x[i], r.y[i], r.v_ratio[i], r.cp[i]
+        );
     }
 
-    // Reference values from thin airfoil theory
-    println!("=== Reference (thin airfoil) ===");
-    println!("NACA 0012 CL_alpha = 2π = {:.4}", 2.0 * std::f64::consts::PI);
-    println!("NACA 2412 α_L0 ≈ -2.1°, CL(0) ≈ 0.23");
-    println!("NACA 4412 α_L0 ≈ -4.0°, CL(0) ≈ 0.44");
-    println!("NACA 2412 CM_c/4 ≈ -0.053");
-    println!("NACA 4412 CM_c/4 ≈ -0.104");
+    println!("\n=== Summary ===");
+    for (name, m, p, t) in [
+        ("0008", 0.0, 0.0, 0.08),
+        ("0012", 0.0, 0.0, 0.12),
+        ("2412", 0.02, 0.4, 0.12),
+        ("4412", 0.04, 0.4, 0.12),
+    ] {
+        let r0 = solve_theodorsen(m, p, t, 0.0, 200);
+        let r4 = solve_theodorsen(m, p, t, 4.0_f64.to_radians(), 200);
+        println!(
+            "NACA {}: CL(0)={:+.4}  CL(4)={:+.4}  CM={:+.4}  ε_T={:+.2}°",
+            name,
+            r0.cl,
+            r4.cl,
+            r0.cm_c4,
+            r0.epsilon_t.to_degrees()
+        );
+    }
 }
