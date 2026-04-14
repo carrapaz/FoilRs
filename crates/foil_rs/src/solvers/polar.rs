@@ -26,6 +26,8 @@ pub enum PolarMode {
     Panel,
     /// Use the cheap approximate Cp/coefficients model.
     Approx,
+    /// Theodorsen conformal mapping for CL/CM, panel BL for CD.
+    Theodorsen,
 }
 
 #[derive(Clone, Debug)]
@@ -97,6 +99,73 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
         for &a in &alphas {
             let sol = super::panel::compute_approx_solution(params, a);
             rows.push(polar_row(&sol, a, beta, bl_inputs));
+        }
+        return PolarSweepResult {
+            rows,
+            used_fallback: false,
+        };
+    }
+
+    if mode == PolarMode::Theodorsen {
+        let beta =
+            (1.0 - flow.mach * flow.mach).clamp(0.05, 1.0).sqrt();
+        let bl_inputs = BoundaryLayerInputs::new(
+            flow.reynolds,
+            flow.mach,
+            flow.viscous,
+            flow.free_transition,
+            DEFAULT_FORCED_TRIP_X,
+        );
+
+        // Panel system for BL-based CD (Theodorsen doesn't compute drag).
+        let owned_system;
+        let panel_sys = match system {
+            Some(sys) => Some(sys),
+            None => {
+                owned_system = PanelLuSystem::new(params);
+                owned_system.as_ref()
+            }
+        };
+
+        let (m, p, t) = (
+            params.m() as f64,
+            params.p() as f64,
+            params.t() as f64,
+        );
+
+        let mut rows = Vec::with_capacity(capacity);
+        for &a in &alphas {
+            let alpha_rad = (a as f64).to_radians();
+            let theo = super::theodorsen::solve_theodorsen(
+                m, p, t, alpha_rad, 200,
+            );
+
+            // CL and CM from Theodorsen (exact), with PG compressibility.
+            let cl = (theo.cl as f32) / beta;
+            let cm_c4 = theo.cm_c4 as f32;
+
+            // CD from panel BL (best we have until Phase 3).
+            let panel_sol = panel_sys
+                .map(|sys| sys.panel_solution(params, a))
+                .unwrap_or_else(|| {
+                    super::panel::compute_approx_solution(params, a)
+                });
+            let boundary_layer =
+                estimate_boundary_layer(&panel_sol, &bl_inputs);
+            let cd_lift_dependent = 0.003 * cl * cl;
+
+            rows.push(PolarRow {
+                alpha_deg: a,
+                cl,
+                cm_c4,
+                cd_profile: boundary_layer
+                    .as_ref()
+                    .map(|b| b.cd_profile + cd_lift_dependent),
+                probable_stall: boundary_layer
+                    .as_ref()
+                    .map(|b| b.probable_stall)
+                    .unwrap_or(false),
+            });
         }
         return PolarSweepResult {
             rows,
