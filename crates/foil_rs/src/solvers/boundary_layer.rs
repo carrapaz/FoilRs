@@ -88,14 +88,16 @@ pub fn estimate_boundary_layer(
         return None;
     }
 
-    // Use smoothed Cp to remove LE/TE panel spikes that would
-    // poison the Thwaites u⁵ integral via a single extreme value.
-    let (cp_u, cp_l) = solution.smoothed_cp();
-
-    let upper =
-        integrate_surface(&solution.upper_coords, &cp_u, inputs);
-    let lower =
-        integrate_surface(&solution.lower_coords, &cp_l, inputs);
+    let upper = integrate_surface(
+        &solution.upper_coords,
+        &solution.cp_upper,
+        inputs,
+    );
+    let lower = integrate_surface(
+        &solution.lower_coords,
+        &solution.cp_lower,
+        inputs,
+    );
 
     let cd = upper.cd_squire_young + lower.cd_squire_young;
 
@@ -287,12 +289,6 @@ pub fn transpiration_velocities(
 }
 
 pub fn speed_from_cp(cp: f32, inputs: &BoundaryLayerInputs) -> f32 {
-    // Clamp Cp to the physical range.  For subsonic incompressible flow,
-    // the minimum Cp is bounded by the vacuum limit (Cp ≈ −2/(γM²) for
-    // compressible, or about −10 for M=0.3).  In practice, NACA 4-digit
-    // airfoils never exceed Cp ≈ −3 even at stall.  Limiting Cp here
-    // prevents panel sampling artifacts (off-surface LE/TE spikes) from
-    // producing ue values that poison the Thwaites u⁵ integral.
-    let cp_corr = (cp / inputs.beta).clamp(-2.5, 1.0);
+    let cp_corr = cp / inputs.beta;
     (1.0 - cp_corr).max(1e-4).sqrt()
 }

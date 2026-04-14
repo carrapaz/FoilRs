@@ -393,14 +393,11 @@ impl PanelLuSystem {
         let mut local = params.clone();
         local.num_points = effective_num_points(params);
 
-        // Off-surface Cp sampling is still used for BL and visualization.
-        let cp_sol = build_cp_samples(
-            &local,
-            freestream,
-            &self.panels,
-            &sources,
-            gamma,
-        );
+        // Build Cp from on-surface V_t at panel collocation points.
+        // This is the physically correct panel-method output — no
+        // off-surface sampling artifacts that blow up the BL at high Re.
+        let cp_sol =
+            cp_from_surface_vt(&self.panels, &vt, &local);
 
         let (cl_approx, cm_approx, _) =
             approx_section_coeffs(params, alpha_deg);
@@ -924,6 +921,86 @@ fn build_cp_samples(
         x: xs,
         cp_upper: cp_u,
         cp_lower: cp_l,
+        upper_coords,
+        lower_coords,
+    }
+}
+
+/// Build Cp arrays from on-surface tangential velocity (V_t at panel
+/// collocation points).  No off-surface sampling → no LE/TE singularity
+/// artifacts.  Interpolates panel-midpoint data to cosine-spaced stations.
+fn cp_from_surface_vt(
+    panels: &[Panel],
+    vt: &[f32],
+    params: &NacaParams,
+) -> CpSamples {
+    let n_stations = (params.num_points / 2).max(32);
+    let m = params.m();
+    let p = params.p();
+    let t = params.t();
+
+    // Find LE panel index.
+    let le_idx = panels
+        .iter()
+        .enumerate()
+        .min_by(|(_, a), (_, b)| a.mid.x.total_cmp(&b.mid.x))
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+
+    // Build sorted (x, Cp, coord) arrays per surface from panel data.
+    // Geometry-lower (0..=le_idx) is aerodynamically upper (sign swap).
+    let mut upper_data: Vec<(f32, f32, Vec2)> = (0..=le_idx)
+        .map(|i| (panels[i].mid.x, 1.0 - vt[i] * vt[i], panels[i].mid))
+        .collect();
+    upper_data.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+    let mut lower_data: Vec<(f32, f32, Vec2)> =
+        (le_idx + 1..panels.len())
+            .map(|i| {
+                (panels[i].mid.x, 1.0 - vt[i] * vt[i], panels[i].mid)
+            })
+            .collect();
+    lower_data.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+    // Interpolate to cosine-spaced x stations.
+    let mut xs = Vec::with_capacity(n_stations);
+    let mut cp_upper = Vec::with_capacity(n_stations);
+    let mut cp_lower = Vec::with_capacity(n_stations);
+    let mut upper_coords = Vec::with_capacity(n_stations);
+    let mut lower_coords = Vec::with_capacity(n_stations);
+
+    let upper_cp_only: Vec<(f32, f32)> =
+        upper_data.iter().map(|d| (d.0, d.1)).collect();
+    let lower_cp_only: Vec<(f32, f32)> =
+        lower_data.iter().map(|d| (d.0, d.1)).collect();
+
+    for i in 0..n_stations {
+        let beta = i as f32 / (n_stations - 1) as f32;
+        let x_c = 0.5 * (1.0 - (PI * beta).cos());
+
+        let camber = camber_line(m, p, x_c);
+        let slope = camber_slope(m, p, x_c);
+        let theta = slope.atan();
+        let thickness = thickness_distribution(t, x_c);
+
+        xs.push(x_c);
+        cp_upper.push(interp_cp(&upper_cp_only, x_c));
+        cp_lower.push(interp_cp(&lower_cp_only, x_c));
+        // Coordinates on the actual surface (for BL arc-length).
+        upper_coords.push(Vec2::new(
+            x_c - thickness * theta.sin(),
+            camber + thickness * theta.cos(),
+        ));
+        lower_coords.push(Vec2::new(
+            x_c + thickness * theta.sin(),
+            camber - thickness * theta.cos(),
+        ));
+    }
+
+    CpSamples {
+        x: xs,
+        cp_upper,
+        cp_lower,
         upper_coords,
         lower_coords,
     }
