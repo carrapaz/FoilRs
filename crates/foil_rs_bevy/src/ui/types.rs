@@ -39,28 +39,18 @@ pub enum TableField {
     TransitionMode,
 }
 
-#[derive(Resource, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Resource, Clone, Copy, PartialEq, Eq)]
 pub enum UiInputMode {
+    #[default]
     SliderOnly,
     TypeOnly,
 }
 
-impl Default for UiInputMode {
-    fn default() -> Self {
-        Self::SliderOnly
-    }
-}
-
-#[derive(Resource, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Resource, Clone, Copy, PartialEq, Eq)]
 pub enum UiColorThemeMode {
+    #[default]
     Colorful,
     XFoilMono,
-}
-
-impl Default for UiColorThemeMode {
-    fn default() -> Self {
-        Self::Colorful
-    }
 }
 
 impl UiColorThemeMode {
@@ -86,16 +76,11 @@ pub struct PanelSections {
     pub polars_open: bool,
 }
 
-#[derive(Resource, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Resource, Clone, Copy, PartialEq, Eq)]
 pub enum UiCoeffMode {
+    #[default]
     Panel,
     Approx,
-}
-
-impl Default for UiCoeffMode {
-    fn default() -> Self {
-        Self::Panel
-    }
 }
 
 impl UiCoeffMode {

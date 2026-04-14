@@ -57,8 +57,10 @@ struct RefPoint {
 #[derive(serde::Deserialize)]
 struct Summary {
     cl_alpha_per_rad: f64,
-    cl_max: f64,
-    alpha_stall_deg: f64,
+    #[serde(rename = "cl_max")]
+    _cl_max: f64,
+    #[serde(rename = "alpha_stall_deg")]
+    _alpha_stall_deg: f64,
     cd_min: f64,
     alpha_zero_lift_deg: f64,
 }

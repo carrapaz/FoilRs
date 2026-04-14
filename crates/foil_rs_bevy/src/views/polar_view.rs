@@ -23,6 +23,7 @@ pub(super) struct PolarGraphPrimitives {
     pub used_fallback: bool,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn compute_polar_primitives(
     params: &NacaParams,
     flow: &FlowSettings,
@@ -72,6 +73,7 @@ pub(super) fn compute_polar_primitives(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_polar_primitives(
     prims: &PolarGraphPrimitives,
     gizmos: &mut Gizmos,

@@ -19,6 +19,7 @@ use super::types::{
     UiCoeffMode, UiColorThemeMode, UiInputMode, UiRoot, VisualMode,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn setup_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -47,6 +48,7 @@ pub fn setup_ui(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn spawn_ui_root(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -132,6 +134,7 @@ pub(super) fn spawn_ui_root(
     root_entity
 }
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_left_panel(
     panel: &mut ChildSpawnerCommands<'_>,
     asset_server: &AssetServer,

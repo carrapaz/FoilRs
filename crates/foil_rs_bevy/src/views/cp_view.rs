@@ -94,6 +94,7 @@ pub(super) fn compute_cp_graph_primitives(
 }
 
 /// Draw Cp(x) graph below the airfoil, in “screen-ish” coordinates.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_cp_graph_primitives(
     prims: &CpGraphPrimitives,
     gizmos: &mut Gizmos,

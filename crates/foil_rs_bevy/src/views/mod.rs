@@ -53,6 +53,7 @@ impl From<&NacaParams> for NacaKey {
 }
 
 #[derive(Default)]
+#[allow(clippy::type_complexity)]
 pub struct VizCache {
     naca_key: Option<NacaKey>,
     body: Vec<Vec2>,
@@ -81,6 +82,7 @@ pub struct VizCache {
 }
 
 /// Main drawing system: airfoil + either field or Cp(x) depending on VisualMode.
+#[allow(clippy::too_many_arguments)]
 pub fn draw_airfoil_and_visualization(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -184,10 +186,9 @@ pub fn draw_airfoil_and_visualization(
         );
         if let (Some(first), Some(last)) =
             (cache.body_world.first(), cache.body_world.last())
+            && (*first - *last).length_squared() > 1e-6
         {
-            if (*first - *last).length_squared() > 1e-6 {
-                gizmos.line_2d(*last, *first, airfoil_color);
-            }
+            gizmos.line_2d(*last, *first, airfoil_color);
         }
     }
 

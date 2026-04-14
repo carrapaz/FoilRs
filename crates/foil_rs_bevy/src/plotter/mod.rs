@@ -98,6 +98,7 @@ pub fn refresh_cp_labels(
 }
 
 /// Refresh axis labels for the polar plots (α, CL, CDp).
+#[allow(clippy::too_many_arguments)]
 pub fn refresh_polar_labels(
     commands: &mut Commands,
     asset_server: &AssetServer,

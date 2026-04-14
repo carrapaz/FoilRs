@@ -14,7 +14,10 @@ fn main() {
 
     println!("\n=== NACA 2412 α=0° Cp ===");
     let r = solve_theodorsen(0.02, 0.4, 0.12, 0.0, 200);
-    println!("CL={:.4} (ref 0.23), CM={:.4} (ref -0.053)", r.cl, r.cm_c4);
+    println!(
+        "CL={:.4} (ref 0.23), CM={:.4} (ref -0.053)",
+        r.cl, r.cm_c4
+    );
     println!("x\t\ty\t\tv/V\t\tCp");
     for i in (0..r.x.len()).step_by(5) {
         println!(

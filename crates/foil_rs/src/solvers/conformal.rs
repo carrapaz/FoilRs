@@ -63,7 +63,7 @@ pub fn solve_conformal(
     let half = n / 2;
     for i in 0..n {
         let theta = 2.0 * PI * i as f64 / n as f64;
-        let x_c = 0.5 * (1.0 - theta.cos());
+        let x_c = 0.5 * (1.0 + theta.cos()); // θ=0→TE, θ=π→LE
 
         let camber = camber_line_f64(m, p, x_c);
         let slope = camber_slope_f64(m, p, x_c);
@@ -81,158 +81,63 @@ pub fn solve_conformal(
         }
     }
 
-    // Step 2: Compute the log-radius ψ and angular deviation ε.
-    // The airfoil contour in polar-ish form:
-    //   z(θ) = R(θ) · exp(i·Θ(θ))
-    // where R = |z - z_center| and Θ = arg(z - z_center).
-    //
-    // For the Theodorsen method, we work with the near-circle form:
-    //   z(θ) ≈ a·(exp(iθ) + Σ aₙ·exp(-inθ))
-    // But the simplest correct approach: compute the velocity directly
-    // from the geometry using the Karman-Trefftz result.
-    //
-    // Actually, for a practical implementation, let me use the
-    // DIRECT surface-speed method (Eppler's approach):
-    //
-    // For a closed contour, the surface speed ratio is:
-    //   V/V∞ = [sin(α + β(s)) + Γ/(2π)] × ds_circle/ds_body
-    //
-    // where β(s) is the local body-surface angle (tangent direction),
-    // ds_circle/ds_body is the metric ratio from the conformal map,
-    // and Γ is the circulation (from Kutta condition).
-    //
-    // For thin airfoils, this simplifies significantly. But for exact
-    // results, I need the full Theodorsen iteration.
-    //
-    // Let me implement the Theodorsen iteration:
-
-    // The contour z(θ) defines the physical plane.
-    // Write z(θ) = exp(ψ(θ) + iφ(θ)) where ψ is the log-modulus
-    // deviation and φ is the argument.
-    //
-    // Actually, let me use a simpler approach that still gives exact
-    // results: the vortex-sheet strength on the body.
-    //
-    // For a conformal-mapped airfoil, the surface speed is:
-    //   q(θ)/V∞ = [2·sin(θ + α - ε(θ)) + Γ/(πa)] / [dz/dθ| / a]
-    //
-    // This requires computing ε(θ), the angular shift, via Theodorsen's
-    // iteration.
-
-    // SIMPLIFIED APPROACH: use the thin-airfoil / Karman integral
-    // for now, then iterate if needed.
-    //
-    // For a body defined by (x(θ), y(θ)) with θ parameterizing the
-    // unit circle, the inviscid surface speed is computed by finding
-    // the conformal map.  The Theodorsen method:
-    //
-    // 1. Compute r(θ) = |z(θ)| and φ(θ) = arg(z(θ))
-    // 2. Define ψ(θ) = ln(r(θ)/a) where a = average radius
-    // 3. The conjugate function ε = H[ψ] (Hilbert transform)
-    // 4. Update θ' = θ + ε and recompute z(θ')
-    // 5. Iterate until ε converges
-
-    // Center at the contour centroid (minimizes radius variation).
+    // Step 2: Compute the angular deviation ε from the body geometry.
+    // Center the contour at its centroid.
     let x_mid = x_body.iter().sum::<f64>() / n as f64;
     let y_mid = y_body.iter().sum::<f64>() / n as f64;
-    let mut zx: Vec<f64> = x_body.iter().map(|&x| x - x_mid).collect();
-    let mut zy: Vec<f64> = y_body.iter().map(|&y| y - y_mid).collect();
+    let zx: Vec<f64> = x_body.iter().map(|&x| x - x_mid).collect();
+    let zy: Vec<f64> = y_body.iter().map(|&y| y - y_mid).collect();
 
-    // Compute the average radius and the log-radius deviation.
+    // Polar coordinates of body points relative to center.
     let r: Vec<f64> = zx
         .iter()
         .zip(&zy)
         .map(|(&x, &y)| (x * x + y * y).sqrt().max(1e-12))
         .collect();
-    let a = r.iter().sum::<f64>() / n as f64; // average radius
-    let mut psi: Vec<f64> = r.iter().map(|&ri| (ri / a).ln()).collect();
+    let ln_r_mean = r.iter().map(|&ri| ri.ln()).sum::<f64>() / n as f64;
+    let a = ln_r_mean.exp(); // geometric mean radius
 
-    // Theodorsen iteration: ε = H[ψ], then update the parameterization.
+    // Angular position of each body point.
+    let phi: Vec<f64> =
+        zx.iter().zip(&zy).map(|(&x, &y)| y.atan2(x)).collect();
+
+    // Angular deviation: ε_i = Φ_i - θ_i.
     let mut epsilon = vec![0.0_f64; n];
-
-    for _iter in 0..30 {
-        // Hilbert transform via DFT: ε = H[ψ].
-        // H[ψ](θ) = (1/π) PV ∫ ψ(θ') cot((θ-θ')/2) dθ'
-        // In Fourier space: if ψ = Σ (aₙ cos nθ + bₙ sin nθ),
-        // then ε = Σ (aₙ sin nθ - bₙ cos nθ) (for n > 0).
-        let (a_coeffs, b_coeffs) = dft_real(n, &psi);
-        epsilon = vec![0.0; n];
-        for i in 0..n {
-            let theta_i = 2.0 * PI * i as f64 / n as f64;
-            for k in 1..n / 2 {
-                let kf = k as f64;
-                epsilon[i] += a_coeffs[k] * (kf * theta_i).sin()
-                    - b_coeffs[k] * (kf * theta_i).cos();
-            }
+    for i in 0..n {
+        let theta_i = 2.0 * PI * i as f64 / n as f64;
+        let mut diff = phi[i] - theta_i;
+        while diff > PI {
+            diff -= 2.0 * PI;
         }
-
-        // Update the parameterization: θ' = θ + ε
-        // Recompute the body points at the updated angles.
-        let mut new_zx = Vec::with_capacity(n);
-        let mut new_zy = Vec::with_capacity(n);
-        for i in 0..n {
-            let theta_prime =
-                2.0 * PI * i as f64 / n as f64 + epsilon[i];
-            let x_c = 0.5 * (1.0 - theta_prime.cos());
-            let x_c = x_c.clamp(0.0, 1.0);
-
-            let camber = camber_line_f64(m, p, x_c);
-            let slope = camber_slope_f64(m, p, x_c);
-            let thick = thickness_f64(t, x_c);
-            let angle = slope.atan();
-
-            if i <= half {
-                new_zx.push(x_c - thick * angle.sin() - x_mid);
-                new_zy.push(camber + thick * angle.cos() - y_mid);
-            } else {
-                new_zx.push(x_c + thick * angle.sin() - x_mid);
-                new_zy.push(camber - thick * angle.cos() - y_mid);
-            }
+        while diff < -PI {
+            diff += 2.0 * PI;
         }
-        zx = new_zx;
-        zy = new_zy;
-
-        // Recompute ψ.
-        let r: Vec<f64> = zx
-            .iter()
-            .zip(&zy)
-            .map(|(&x, &y)| (x * x + y * y).sqrt().max(1e-12))
-            .collect();
-        let a_new = r.iter().sum::<f64>() / n as f64;
-        psi = r.iter().map(|&ri| (ri / a_new).ln()).collect();
-
-        // Check convergence.
-        let max_eps =
-            epsilon.iter().map(|e| e.abs()).fold(0.0_f64, f64::max);
-        if max_eps < 1e-10 {
-            break;
-        }
+        epsilon[i] = diff;
     }
 
-    // Step 3: Surface velocity via the Theodorsen formula.
+    // Step 3: Surface velocity via the conformal mapping formula.
     //
-    // The velocity on the circle (radius a=1) with Kutta at θ=0:
-    //   V_circle(θ) = 2[sin(θ - α) + sin(α + ε₀)]
-    // where ε₀ = ε(0) is the TE angular deviation (zero for symmetric).
+    // For flow past the near-circle with Kutta condition at θ=0 (TE):
+    //   V_circle(θ) = 2[sin(φ(θ) - α) + sin(α - ε₀)]
+    // where φ(θ) = θ + ε(θ) is the angular position of body point θ,
+    // and ε₀ = ε(0) is the TE angular deviation.
     //
-    // The conformal map Jacobian:
-    //   |dz/dζ| = exp(ψ) · √(ψ'² + (1+ε')²)
-    //
-    // Surface speed on the airfoil:
-    //   q(θ)/V∞ = V_circle(θ) / |dz/dζ|
+    // Surface speed on the airfoil via metric ratio:
+    //   q(θ)/V∞ = V_circle(θ) × a / (ds/dθ)
+    // where ds/dθ is the body arc-length derivative.
 
     let te_epsilon = epsilon[0];
-    let kutta_circ = (alpha_rad + te_epsilon).sin();
+    let kutta_circ = (alpha_rad - te_epsilon).sin();
 
-    // Compute dψ/dθ and dε/dθ by central finite differences.
-    let mut dpsi = vec![0.0_f64; n];
-    let mut deps = vec![0.0_f64; n];
-    for i in 0..n {
+    // Compute ds/dθ by central finite differences on the body.
+    let dtheta = 2.0 * PI / n as f64;
+    let mut ds_dtheta = vec![0.0_f64; n];
+    for (i, ds) in ds_dtheta.iter_mut().enumerate().take(n) {
         let ip = (i + 1) % n;
         let im = (i + n - 1) % n;
-        let dtheta = 2.0 * PI / n as f64;
-        dpsi[i] = (psi[ip] - psi[im]) / (2.0 * dtheta);
-        deps[i] = (epsilon[ip] - epsilon[im]) / (2.0 * dtheta);
+        let dxdt = (x_body[ip] - x_body[im]) / (2.0 * dtheta);
+        let dydt = (y_body[ip] - y_body[im]) / (2.0 * dtheta);
+        *ds = (dxdt * dxdt + dydt * dydt).sqrt();
     }
 
     let mut v_ratio = Vec::with_capacity(n);
@@ -244,33 +149,19 @@ pub fn solve_conformal(
     for i in 0..n {
         let theta_i = 2.0 * PI * i as f64 / n as f64;
 
-        // Circle velocity with Kutta:
-        //   V_θ = -2sin(θ-α) - 2sin(α+ε₀)  (Kutta at θ=0)
-        //   q = 2|sin(θ-α) + sin(α+ε₀)|
-        let v_circle = 2.0 * ((theta_i - alpha_rad).sin() + kutta_circ);
-
-        // Map Jacobian: |dz/dζ|/(2πa) normalized.
-        // For thin airfoils exp(ψ) ≈ 1 and 1+ε' ≈ 1.
-        let jacobian = psi[i].exp()
-            * (dpsi[i] * dpsi[i] + (1.0 + deps[i]).powi(2)).sqrt();
-
-        let vr = if jacobian.abs() > 1e-10 {
-            v_circle / jacobian
-        } else {
-            0.0
-        };
+        let v_circle = 2.0 * ((phi[i] - alpha_rad).sin() + kutta_circ);
+        let vr = v_circle * a / ds_dtheta[i].max(1e-12);
 
         v_ratio.push(vr);
         cp.push(1.0 - vr * vr);
-        x_out.push(zx[i] + x_mid);
-        y_out.push(zy[i] + y_mid);
+        x_out.push(x_body[i]);
+        y_out.push(y_body[i]);
         theta_out.push(theta_i);
     }
 
-    // CL from the Kutta-Joukowski: CL = 2π(sin(α + ε_TE) + sin(α))
-    // More precisely: CL = 4π·a·sin(α + ε(0)) / chord ≈ 2π·sin(α + α₀L)
-    let cl = 2.0 * PI * kutta_circ; // KJ: CL = 2π·sin(α + ε_TE)
-    let alpha_0l = -te_epsilon; // zero-lift angle
+    // CL from Kutta-Joukowski: CL = 2π·sin(α - ε_TE)
+    let cl = 2.0 * PI * kutta_circ;
+    let alpha_0l = te_epsilon; // zero-lift angle
 
     // CM about c/4 from conformal mapping theory:
     // CM = -π/2 · (A₁ - A₂) where A₁, A₂ are the Fourier coefficients
@@ -287,24 +178,6 @@ pub fn solve_conformal(
         cm_c4,
         alpha_0l,
     }
-}
-
-/// Simple DFT to extract real Fourier coefficients.
-fn dft_real(n: usize, f: &[f64]) -> (Vec<f64>, Vec<f64>) {
-    let mut a = vec![0.0_f64; n / 2 + 1];
-    let mut b = vec![0.0_f64; n / 2 + 1];
-    for k in 0..=n / 2 {
-        let kf = k as f64;
-        for i in 0..n {
-            let theta = 2.0 * PI * i as f64 / n as f64;
-            a[k] += f[i] * (kf * theta).cos();
-            b[k] += f[i] * (kf * theta).sin();
-        }
-        a[k] *= 2.0 / n as f64;
-        b[k] *= 2.0 / n as f64;
-    }
-    a[0] *= 0.5; // DC component
-    (a, b)
 }
 
 fn camber_line_f64(m: f64, p: f64, x: f64) -> f64 {

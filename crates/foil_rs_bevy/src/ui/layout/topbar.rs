@@ -23,6 +23,7 @@ use super::super::types::{
 
 const TOP_BAR_HEIGHT: f32 = 56.0;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn spawn_top_bar(
     root: &mut ChildSpawnerCommands<'_>,
     asset_server: &AssetServer,

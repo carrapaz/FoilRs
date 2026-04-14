@@ -61,10 +61,9 @@ pub(super) fn compute_panel_primitives(
 
     if let (Some(first), Some(last)) =
         (body_world.first(), body_world.last())
+        && (*first - *last).length_squared() > 1e-6
     {
-        if (*first - *last).length_squared() > 1e-6 {
-            prims.lines.push((*last, *first, panel_color));
-        }
+        prims.lines.push((*last, *first, panel_color));
     }
 
     prims

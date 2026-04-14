@@ -93,6 +93,7 @@ pub fn handle_theme_toggle_button(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn update_theme_toggle_button(
     theme_mode: Res<UiColorThemeMode>,
     mut commands: Commands,
@@ -133,10 +134,10 @@ pub fn update_theme_toggle_button(
             ));
         }
 
-        if let Some(&child) = children.first() {
-            if let Ok(mut text) = texts.get_mut(child) {
-                text.0 = theme_mode.label().to_string();
-            }
+        if let Some(&child) = children.first()
+            && let Ok(mut text) = texts.get_mut(child)
+        {
+            text.0 = theme_mode.label().to_string();
         }
     }
 }
@@ -295,6 +296,7 @@ pub fn update_naca_heading(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn update_left_panel_visibility(
     mode: Res<VisualMode>,
     mut main: Query<
@@ -483,6 +485,7 @@ pub fn handle_numeric_input_edit(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn sync_numeric_inputs(
     mut commands: Commands,
     focus: Res<NumericInputFocus>,
@@ -914,6 +917,7 @@ pub struct UiPanelSystemCache {
     system: Option<PanelLuSystem>,
 }
 
+#[allow(clippy::type_complexity)]
 pub fn handle_view_buttons(
     mut mode: ResMut<VisualMode>,
     mut commands: Commands,
@@ -959,6 +963,7 @@ pub fn handle_view_buttons(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn handle_section_toggle_buttons(
     mut sections: ResMut<PanelSections>,
     mut commands: Commands,
@@ -993,11 +998,10 @@ pub fn handle_section_toggle_buttons(
                 .insert(ThemeBackgroundColor(desired_bg));
         }
 
-        if let Some(&child) = children.first() {
-            if let Ok(mut text) = texts.get_mut(child) {
-                text.0 =
-                    style::section_header_label(toggle.section, open);
-            }
+        if let Some(&child) = children.first()
+            && let Ok(mut text) = texts.get_mut(child)
+        {
+            text.0 = style::section_header_label(toggle.section, open);
         }
     }
 
@@ -1010,6 +1014,7 @@ pub fn handle_section_toggle_buttons(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn handle_flow_toggle_buttons(
     mut flow: ResMut<FlowSettings>,
     mut commands: Commands,
@@ -1061,11 +1066,11 @@ pub fn handle_flow_toggle_buttons(
             ));
         }
 
-        if let Some(&child) = children.first() {
-            if let Ok(mut text) = texts.get_mut(child) {
-                text.0 =
-                    style::flow_toggle_label(*kind, active).to_string();
-            }
+        if let Some(&child) = children.first()
+            && let Ok(mut text) = texts.get_mut(child)
+        {
+            text.0 =
+                style::flow_toggle_label(*kind, active).to_string();
         }
     }
 }

@@ -54,7 +54,7 @@ pub fn solve_theodorsen(
     n: usize,
 ) -> TheodorsenResult {
     let n = n.max(64);
-    let n = if n % 2 != 0 { n + 1 } else { n };
+    let n = if !n.is_multiple_of(2) { n + 1 } else { n };
 
     // Half-focal-distance of the elliptic coordinate system.
     // For unit chord: 2a = half-chord = 0.5, so a = 0.25.
@@ -153,8 +153,9 @@ pub fn solve_theodorsen(
 
         let denom = geom * deriv;
 
-        let numer =
-            ((ph + alpha_rad).sin() + (alpha_rad + epsilon_t).sin()).abs();
+        let numer = ((ph + alpha_rad).sin()
+            + (alpha_rad + epsilon_t).sin())
+        .abs();
 
         let vr = if denom > 1e-12 { numer / denom } else { 0.0 };
 
@@ -261,10 +262,10 @@ fn hilbert_transform(f: &[f64]) -> Vec<f64> {
     // Compute Fourier coefficients.
     for k in 0..=n / 2 {
         let kf = k as f64;
-        for i in 0..n {
+        for (i, &fi) in f.iter().enumerate().take(n) {
             let phi = 2.0 * PI * i as f64 / n as f64;
-            a[k] += f[i] * (kf * phi).cos();
-            b[k] += f[i] * (kf * phi).sin();
+            a[k] += fi * (kf * phi).cos();
+            b[k] += fi * (kf * phi).sin();
         }
         a[k] *= 2.0 / n as f64;
         b[k] *= 2.0 / n as f64;
@@ -276,12 +277,11 @@ fn hilbert_transform(f: &[f64]) -> Vec<f64> {
 
     // Reconstruct the Hilbert transform (conjugate function).
     let mut result = vec![0.0; n];
-    for i in 0..n {
+    for (i, res) in result.iter_mut().enumerate().take(n) {
         let phi = 2.0 * PI * i as f64 / n as f64;
         for k in 1..n / 2 {
             let kf = k as f64;
-            result[i] +=
-                a[k] * (kf * phi).sin() - b[k] * (kf * phi).cos();
+            *res += a[k] * (kf * phi).sin() - b[k] * (kf * phi).cos();
         }
     }
     result

@@ -17,6 +17,7 @@ use super::super::types::{
     NumericField, NumericInput, NumericInputRow, NumericInputText,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn spawn_numeric_input(
     parent: &mut ChildSpawnerCommands<'_>,
     asset_server: &AssetServer,
