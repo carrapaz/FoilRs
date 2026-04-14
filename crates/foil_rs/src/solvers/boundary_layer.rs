@@ -287,6 +287,12 @@ pub fn transpiration_velocities(
 }
 
 pub fn speed_from_cp(cp: f32, inputs: &BoundaryLayerInputs) -> f32 {
-    let cp_corr = (cp / inputs.beta).clamp(-5.0, 5.0);
+    // Clamp Cp to the physical range.  For subsonic incompressible flow,
+    // the minimum Cp is bounded by the vacuum limit (Cp ≈ −2/(γM²) for
+    // compressible, or about −10 for M=0.3).  In practice, NACA 4-digit
+    // airfoils never exceed Cp ≈ −3 even at stall.  Limiting Cp here
+    // prevents panel sampling artifacts (off-surface LE/TE spikes) from
+    // producing ue values that poison the Thwaites u⁵ integral.
+    let cp_corr = (cp / inputs.beta).clamp(-2.5, 1.0);
     (1.0 - cp_corr).max(1e-4).sqrt()
 }
