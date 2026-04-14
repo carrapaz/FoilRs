@@ -117,7 +117,7 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
             DEFAULT_FORCED_TRIP_X,
         );
 
-        // Panel system for BL-based CD (Theodorsen doesn't compute drag).
+        // Panel system for BL-based CD (smoothed Cp → stable BL).
         let owned_system;
         let panel_sys = match system {
             Some(sys) => Some(sys),
@@ -144,7 +144,9 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
             let cl = (theo.cl as f32) / beta;
             let cm_c4 = theo.cm_c4 as f32;
 
-            // CD from panel BL (best we have until Phase 3).
+            // CD from panel BL with smoothed Cp (stable at any Re).
+            // Theodorsen Cp has a TE singularity that the BL can't
+            // handle; the panel smoothed Cp is spike-free.
             let panel_sol = panel_sys
                 .map(|sys| sys.panel_solution(params, a))
                 .unwrap_or_else(|| {
@@ -153,18 +155,20 @@ pub fn compute_polar_sweep_parallel_with_system_mode(
             let boundary_layer =
                 estimate_boundary_layer(&panel_sol, &bl_inputs);
             let cd_lift_dependent = 0.003 * cl * cl;
+            let cd_profile = boundary_layer
+                .as_ref()
+                .map(|b| b.cd_profile + cd_lift_dependent);
+            let probable_stall = boundary_layer
+                .as_ref()
+                .map(|b| b.probable_stall)
+                .unwrap_or(false);
 
             rows.push(PolarRow {
                 alpha_deg: a,
                 cl,
                 cm_c4,
-                cd_profile: boundary_layer
-                    .as_ref()
-                    .map(|b| b.cd_profile + cd_lift_dependent),
-                probable_stall: boundary_layer
-                    .as_ref()
-                    .map(|b| b.probable_stall)
-                    .unwrap_or(false),
+                cd_profile,
+                probable_stall,
             });
         }
         return PolarSweepResult {

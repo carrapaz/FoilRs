@@ -88,16 +88,14 @@ pub fn estimate_boundary_layer(
         return None;
     }
 
-    let upper = integrate_surface(
-        &solution.upper_coords,
-        &solution.cp_upper,
-        inputs,
-    );
-    let lower = integrate_surface(
-        &solution.lower_coords,
-        &solution.cp_lower,
-        inputs,
-    );
+    // Use smoothed Cp to remove LE/TE panel spikes that would
+    // poison the Thwaites u⁵ integral via a single extreme value.
+    let (cp_u, cp_l) = solution.smoothed_cp();
+
+    let upper =
+        integrate_surface(&solution.upper_coords, &cp_u, inputs);
+    let lower =
+        integrate_surface(&solution.lower_coords, &cp_l, inputs);
 
     let cd = upper.cd_squire_young + lower.cd_squire_young;
 
