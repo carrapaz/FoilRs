@@ -245,8 +245,12 @@ pub fn integrate_surface_from_ue(
         ue_prev = ue_curr;
     }
 
-    let h_exp = (h_te + 5.0) * 0.5;
-    let cd_sy = 2.0 * theta_te * ue_te.powf(h_exp);
+    // Squire-Young: CD = 2θ_TE (u_TE/V∞)^((H+5)/2)
+    // Clamp ue_te to prevent blow-up from panel Cp spikes at LE/TE.
+    let ue_te_clamped = ue_te.clamp(0.01, 2.0);
+    let h_exp = (h_te.clamp(1.2, 4.0) + 5.0) * 0.5;
+    let cd_sy = (2.0 * theta_te * ue_te_clamped.powf(h_exp))
+        .clamp(0.0, 0.10);
 
     let probable_stall =
         separation_x.map(|x| x > 0.2 && x < 0.95).unwrap_or(false);
